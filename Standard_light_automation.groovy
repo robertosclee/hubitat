@@ -1,3 +1,20 @@
+/**
+ *  Standard light automation - application for Hubitat Elevation hub
+ *
+ *  https://github.com/robertosclee/hubitat/blob/264c611a787fc290110cac03f86c5ebfa2957ca4/Standard_light_automation.groovy
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
+ *  in compliance with the License. You may obtain a copy of the License at:
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software distributed under the License is distributed
+ *  on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License
+ *  for the specific language governing permissions and limitations under the License.
+ *
+ *
+ *  ver. 1.0.0 2023-02-03 kkossev - first version: 'Light Usage Table' sample app code modification
+ */
 
 definition(
     name: "Standard light automation",
