@@ -12,7 +12,12 @@ definition(
 
 preferences {
     def states = allStates()
-    
+    section("INFO") {
+        paragraph "Mode is now <b>${states.mode}</b>"
+        paragraph "Last triggered time is: <b>${state.lasttriggerdt}</b> with \"<b>${state.lasttrigger}</b>\""
+        paragraph "Lux last measured: ${state.lastmeasuredlux}, now: <b>${states.lux}</b> and threshold: <b>${states.luxThreshold}</b>"
+        paragraph "IsDark switch is <b>${states.darkon}</b>"
+    }      
     section("Settings")
     {
         input "aboutRoom", "enum", title: "Select room", options: ["h", "lr", "mb", "g", "k", "s", "w"], required: true
@@ -20,7 +25,7 @@ preferences {
         input "logEnable", "bool", title: "Enable extensive logging", required: true
         input "txtEnable", "bool", title: "Enable description text logging.", defaultValue: true, required: true
     }
-    section("Select devices, <b>mode is now: ${states.mode}</b>") {
+    section("Select devices") {
         input "motionSensorsTurnOn", "capability.motionSensor", title: "Select motion sensors to turn on light(s)", required: false, multiple: true
         input "motionSensorsKeepOn", "capability.motionSensor", title: "Select motion sensors to keep on light(s), <b>motion: ${states.isMotion}</b>", required: false, multiple: true
         input "luxSensor", "capability.illuminanceMeasurement", title: "Select lux sensor, <b>lux measured: ${states.lux}</b>", required: false
@@ -54,6 +59,7 @@ preferences {
                     input "${nms.turnon}", "bool", title: "${nms.statedescription} turn light on? <code style='background-color: yellow'>${nms.turnon}</code>", required: true, defaultValue: false
                     if(nms.values.turnon)
                     {
+                        input "${nms.forcechange}", "bool", title: "${nms.statedescription} force change even if lights on? <code style='background-color: yellow'>${nms.forcechange}</code>", required: true, defaultValue: false
                         input "${nms.stayon}", "number", title: "${nms.statedescription} stayon in seconds <code style='background-color: yellow'>${nms.stayon}</code>", required: true, defaultValue: 30
                         input "${nms.brightness}", "number", title: "${nms.statedescription} brightness (0-100)<code style='background-color: yellow'>${nms.brightness}</code>", required: true, defaultValue: 88
                         input "${nms.color}", "color", title: "${nms.statedescription} color <code style='background-color: yellow'>${nms.color}</code>", required: false, defaultValue: "#ffffff"
@@ -81,7 +87,6 @@ def lightGroupArray()
     return [
         ["mainlights", "Main lights"],
         ["sidelights", "Side lights"],
-      
     ]
 } 
 def stateGroupArray(){
@@ -134,7 +139,6 @@ def initialize() {
     logdebug("initializing...", "initialize")
 
     subscribe(location, "mode", modeChangedHandler)
-
     subscribe(isDarkSwitch, "switch.on", switchesHandler)
     subscribe(isDarkSwitch, "switch.off", switchesHandler)
 
@@ -142,7 +146,6 @@ def initialize() {
     {
         subscribe(luxSensor, "illuminance", luxChangedHandler)
     }
-
     if(motionSensorsTurnOn)
     {
         motionSensorsTurnOn.each { sensor ->
@@ -157,7 +160,6 @@ def initialize() {
             subscribe(sensor, "motion.inactive", motionStoppedKeepOnHandler)
         }
     }
-
     if(roomDoors)
     {
         subscribe(roomDoors, "contact", roomDoorsHandler)
@@ -166,12 +168,10 @@ def initialize() {
     {
         subscribe(houseDoors, "contact.open", houseDoorsHandler)
     }
-
     if(socketPlug)
     {
         subscribe(socketPlug, "power", powerChangedHandler)
     }
-
     if(turnOnButtons)
     {
         subscribe(turnOnButtons, "pushed", buttonTurnOnPushedHandler)
@@ -219,12 +219,13 @@ void handleSimpleMotion(manual = "") //LOW LIGHT AND MOTION ON OR OFF
             }            
             else
             {
-                def cfg = getConfig(currentMode, "mainlights", states.isDark ? "dark" : "no")    
-                handleLightsBasedOnConfig(cfg, mainlights)
+                def cfg = getConfig(currentMode, "mainlights", states.isDarkOrNoCfg)    
+                handleLightsBasedOnConfig(states, cfg, mainlights)
             }            
         }           
     }
 }
+
 void handleSimpleDoor(manual = "") //CONTACT ON OR OFF
 {
     def currentMode = getMode()
@@ -240,11 +241,15 @@ void handleSimpleDoor(manual = "") //CONTACT ON OR OFF
         else if(states.isOpenRoomDoor)
         {
             def cfg = getConfig(currentMode, "mainlights", "roomdoorsopen")
-            handleLightsBasedOnConfig(cfg, mainlights)
+            handleLightsBasedOnConfig(states, cfg, mainlights)
+            
+            runIn(state.stayon, turnOffLights)
         }    
         else if(!states.isOpenRoomDoor)
         {
             mainlights.off()
+            
+            unschedule(turnOffLights)
         }         
     }
 }
@@ -264,7 +269,7 @@ void handleKidsRoom(manual = "") //LEX
         else if(states.isOpenRoomDoor)
         {
             def cfg = getConfig(currentMode, "mainlights", "roomdoorsopen")
-            handleLightsBasedOnConfig(cfg, mainlights)
+            handleLightsBasedOnConfig(states, cfg, mainlights)
         }    
         else if(!states.isOpenRoomDoor)
         {
@@ -277,7 +282,7 @@ void handleMasterBedroom(manual = "")
 {
     def currentMode = getMode()
     def states = allStates()
-    logdebug("states ${states}", "handleMasterBedroom")   
+    //logdebug("states ${states}", "handleMasterBedroom")   
     
     if(states.isvalidmode)
     {
@@ -285,16 +290,29 @@ void handleMasterBedroom(manual = "")
         {
         
         }   
+        else if(manual == "pushsingle")
+        {
+            handleLightsBasedOnConfig(states, getConfig("Normal", "mainlights", "buttonpushed"), mainlights)                        
+            handleLightsBasedOnConfig(states, getConfig("Normal", "sidelights", "buttonpushed"), sidelights)                 
+        }
+        else if(manual == "pushdouble")
+        {
+            handleLightsBasedOnConfig(states, getConfig("Normal", "mainlights", "buttondoublepushed"), mainlights)                        
+            handleLightsBasedOnConfig(states, getConfig("Normal", "sidelights", "buttondoublepushed"), sidelights)                        
+        }        
+        else if(manual == "pushheld")
+        {
+        }              
         else if( ["SleepAll", "SleepSome"].contains(currentMode) )
         {
             def cfg = getConfig(currentMode, "sidelights", "dark")
-            handleLightsBasedOnConfig(cfg, sidelights)
+            handleLightsBasedOnConfig(states, cfg, sidelights)
         }  
         else if( ["Normal"].contains(currentMode) )
         {
             sidelights?.off()
-            def cfg = getConfig(currentMode, "mainlights", "dark")
-            handleLightsBasedOnConfig(cfg, mainlights)
+            def cfg = getConfig(currentMode, "mainlights", states.isDarkOrNoCfg)
+            handleLightsBasedOnConfig(states, cfg, mainlights)
         }         
         else
         {
@@ -317,18 +335,18 @@ void handleLivingRoom(manual = "")
         }   
         else if( ["SleepSome"].contains(currentMode) && states.isSocketPlugUsingPower )
         {
-            handleLightsBasedOnConfig( getConfig(currentMode, "mainlights", "istvon") , mainlights)
-            handleLightsBasedOnConfig( getConfig(currentMode, "sidelights", "istvon") , sidelights)
+            handleLightsBasedOnConfig(states, getConfig(currentMode, "mainlights", "istvon") , mainlights)
+            handleLightsBasedOnConfig(states, getConfig(currentMode, "sidelights", "istvon") , sidelights)
         }  
         else if( ["SleepSome"].contains(currentMode) && !states.isSocketPlugUsingPower )
         {
-            handleLightsBasedOnConfig( getConfig(currentMode, "mainlights", "dark") , mainlights)
-            handleLightsBasedOnConfig( getConfig(currentMode, "sidelights", "dark") , sidelights)
+            handleLightsBasedOnConfig( states, getConfig(currentMode, "mainlights", states.isDarkOrNoCfg) , mainlights)
+            handleLightsBasedOnConfig( states, getConfig(currentMode, "sidelights", states.isDarkOrNoCfg) , sidelights)
         }  
         else if( ["Normal"].contains(currentMode) )
         {
             sidelights?.off()
-            handleLightsBasedOnConfig( getConfig(currentMode, "mainlights", states.isDark ? "dark" : "no") , mainlights)
+            handleLightsBasedOnConfig(states, getConfig(currentMode, "mainlights", states.isDarkOrNoCfg) , mainlights)
         }         
         else
         {
@@ -352,12 +370,12 @@ void handleHallway(manual = "")
         else if(manual == "pushsingle")
         {
             def cfg = getConfig(currentMode, "mainlights", "buttonpushed")    
-            handleLightsBasedOnConfig(cfg, mainlights)                        
+            handleLightsBasedOnConfig(states, cfg, mainlights)                        
         }
         else if(manual == "pushdouble")
         {
             def cfg = getConfig(currentMode, "mainlights", "buttondoublepushed")    
-            handleLightsBasedOnConfig(cfg, mainlights)                        
+            handleLightsBasedOnConfig(states, cfg, mainlights)                        
         }        
         else if(manual == "pushheld")
         {
@@ -371,14 +389,14 @@ void handleHallway(manual = "")
             sidelights.off()
             
             def cfg = getConfig(currentMode, "mainlights", "housedoorsopen")    
-            handleLightsBasedOnConfig(cfg, mainlights)            
+            handleLightsBasedOnConfig(states, cfg, mainlights)            
         }         
         else if(states.mode == "SleepAll" && states.isOpenRoomDoor)
         {
             mainlights.off()
 
             def cfg = getConfig(currentMode, "sidelights", "roomdoorsopen")
-            handleLightsBasedOnConfig(cfg, sidelights)
+            handleLightsBasedOnConfig(states, cfg, sidelights)
         }  
         else
         {
@@ -389,25 +407,33 @@ void handleHallway(manual = "")
             }            
             else
             {
-                def cfg = getConfig(currentMode, "mainlights", states.isDark ? "dark" : "no")    
-                handleLightsBasedOnConfig(cfg, mainlights)
+                def cfg = getConfig(currentMode, "mainlights", states.isDarkOrNoCfg)    
+                handleLightsBasedOnConfig(states, cfg, mainlights)
             }            
         }    
     }    
 }
 
-void handleLightsBasedOnConfig(configs, lights)
+void handleLightsBasedOnConfig(states, configs, lights)
 {
+    logdebug("${states.mode} ➜ <code style='background-color: yellow;'>${configs.base}</code>","handleLightsBasedOnConfig")
     if(configs.values.do)
     {
-        loginfo("${configs.do}","handleLightsBasedOnConfig")
-        if(configs.values.turnon)
+        if( configs.values.turnon && configs.values.forcechange )
         {
-            turnOnLights(configs, lights, comment = "ON ${configs.values}") 
+            turnOnLights(states, configs, lights, comment = "ON FORCED ${configs.values}") 
+        }
+        else if( configs.values.turnon && !configs.values.forcechange && !isAnySwitchOn(lights) )
+        {
+            turnOnLights(states, configs, lights, comment = "ON ${configs.values}, ${states.lux} < ${states.luxThreshold}?") 
+        }
+        else if( !configs.values.turnon )
+        {
+            turnOffGrpLights(lights)
         }
         else
         {
-            turnOffGrpLights(lights)
+            logdebug("NO MATCH, ${configs.values}, ${states.lux} < ${states.luxThreshold}? ","handleLightsBasedOnConfig")   
         }
     }
 }
@@ -416,40 +442,44 @@ void handleLightsBasedOnConfig(configs, lights)
 //EVENTS HANDLERS
 def motionDetectedTurnOnHandler(evt) 
 {
+    unschedule(checkMotionAndTurnOff)
     if(aboutRoom == "h"){ handleHallway() }
     else if(aboutRoom == "mb"){ handleMasterBedroom() }
     else if(aboutRoom == "lr"){ handleLivingRoom() }
     else if ( ["g", "k"].contains(aboutRoom) ) { handleSimpleMotion() }
-    else if ( ["w", "s"].contains(aboutRoom) ) { handleSimpleDoor() }
+    //else if ( ["w", "s"].contains(aboutRoom) ) { handleSimpleDoor() }
 }
 
 def motionDetectedKeepOnHandler(evt) 
 {
-
+  unschedule(checkMotionAndTurnOff)
 }
+
 def motionStoppedTurnOnHandler(evt) 
 {
     
 }
+
 def motionStoppedKeepOnHandler(evt) 
 {
     //def configs = getConfig(getMode(), "mainlights", "dark")
     //TEST IF LIGHTS ARE ON?
-    
-    if ( ["h","lr","mb","k", "g"].contains(aboutRoom) ) //ROOMS WITH MOTION SENSORS
+    if(isAnySwitchOn(mainlights) || isAnySwitchOn(sidelights))
     {
-        if(state.stayon > 0 && state.stayon != null )
+        if ( ["h","lr","mb","k", "g"].contains(aboutRoom) ) //ROOMS WITH MOTION SENSORS
         {
-            runIn(state.stayon, checkMotionAndTurnOff)
-            loginfo("lights off in ${state.stayon}s", "motionStoppedKeepOnHandler")
-        }    
-        else
-        {
-            loginfo("state.stayon == ${state.stayon}", "motionStoppedKeepOnHandler")
+            if(state.stayon > 0 && state.stayon != null )
+            {
+                unschedule(checkMotionAndTurnOff)
+                runIn(state.stayon, checkMotionAndTurnOff)
+                //loginfo("lights off in ${state.stayon}s", "motionStoppedKeepOnHandler")
+            }    
+            else
+            {
+                //loginfo("state.stayon == ${state.stayon}", "motionStoppedKeepOnHandler")
+            }
         }
     }
-
-    
 }
 
 def powerChangedHandler(evt)
@@ -510,19 +540,20 @@ def switchesHandler(evt)
 
 
 def modeChangedHandler(evt) {
-    //logdebug("mode to ${evt.displayName}", "modeChangedHandler")
+    //logdebug("mode to <b>${evt.displayName}</b>", "modeChangedHandler")
     def currentMode = getMode()
+    logdebug("mode to <b>${currentMode}</b>", "modeChangedHandler")
+    
     def states = allStates()
-    
-    
-    if(currentMode == "Away")
+    if( ["SleepAll", "Away"].contains(currentMode))
     {
         turnOffLights()
+        logdebug("mode = ${currentMode}, all lights off","modeChangedHandler(evt)")
     }     
-    else if( ["SleepSome","SleepAll"].contains(currentMode) && aboutRoom == "mb" )
+    else if( ["SleepSome"].contains(currentMode) && ["h","mb"].contains(aboutRoom))
     {
         turnOffLights()
-    }         
+    }
 }
 
 def roomDoorsHandler(evt) 
@@ -537,33 +568,40 @@ def roomDoorsHandler(evt)
 def houseDoorsHandler(evt) 
 {
     logdebug("${evt.device} IS ${isContactOn(evt.device) ? "OPEN" : "DICHT"} : ${evt?.value}", "houseDoorsHandler")
+    if(aboutRoom == "h"){ handleHallway() }
 }
 
 def buttonTurnOnPushedHandler(evt) {
     //logdebug("button ${evt?.displayName} ${evt?.value}", "buttonTurnOnPushedHandler")
     if(aboutRoom == "h"){ handleHallway("pushsingle") }
+    else if(aboutRoom == "mb"){ handleMasterBedroom("pushsingle") }  
 }
 
 def buttonTurnOnDoubleTappedHandler(evt) {
     //logdebug("button ${evt?.displayName} ${evt?.value}", "buttonTurnOnDoubleTappedHandler")
     if(aboutRoom == "h"){ handleHallway("pushdouble") }
+    else if(aboutRoom == "mb"){ handleMasterBedroom("pushdouble") }  
 }
 
 def buttonTurnOnHeldHandler(evt) {
     //logdebug("button ${evt?.displayName} ${evt?.value}", "buttonTurnOnHeldHandler")
     if(aboutRoom == "h"){ handleHallway("pushheld") }
+    else if(aboutRoom == "mb"){ handleMasterBedroom() }
 }
 
 //LIGHTS
-void turnOnLights(configs, lights, comment = "")
+void turnOnLights(states, configs, lights, comment = "")
 {
+    state.lasttrigger = configs.base
+    state.lasttriggerdt = new Date().format('yyyy-MM-dd, EEEE, HH:mm:ss')
+    state.lastmeasuredlux = states.lux
     state.stayon = configs.values.stayon
     lights.each { light ->
         if(isColorDevice(light))
         {
             def hsl = hexToHSL(configs.values.color)
             light.setColor([hue: hsl.hue, saturation: hsl.saturation, level: configs.values.brightness])
-            logdebug "hsl: ${hsl}"
+            //logdebug "hsl: ${hsl}"
         }
         else
         {
@@ -571,7 +609,7 @@ void turnOnLights(configs, lights, comment = "")
         }
         //logdebug "[${allStates().collect { "${it.key} : ${it.value}" }.join("] [")}]"
         //loginfo "ON ${light.displayName} [${light.collect { "${it.key} : ${it.value}" }.join("] [")}]"        
-        loginfo "ON ${light.displayName} with ${configs.do}"
+        loginfo("ON ${light.displayName} [${configs.do}], ${comment}", "turnOnLights")
     }      
 }
 
@@ -583,9 +621,8 @@ def turnOffLights() {
 
 def turnOffGrpLights(lights) {
     lights?.off()
-    loginfo ("Turning off all lights","turnOffLights")
+    loginfo ("Turning off lights","turnOffGrpLights")
 }
-
 
 def checkMotionAndTurnOff() {
     if (!isAnyMotionActive(motionSensorsKeepOn)) {
@@ -593,16 +630,14 @@ def checkMotionAndTurnOff() {
     } else {
         runIn(state.stayon, checkMotionAndTurnOff) // Check again after 1 minute if motion persists
     }
+    unschedule(checkMotionAndTurnOff)
 }
-
 
 //SMALL FUNCTIONS
 def isVirtual(device) {
     return device?.getTypeName()?.toLowerCase()?.contains("virtual") ?: false
 }
-def isSwitchOn(device) {
-    return device.currentValue("switch") == "on"
-}
+
 def isAnySwitchOn(devices)
 {
     def anyOn = devices.find { it.currentValue("switch") == "on" }
@@ -620,7 +655,6 @@ def isColorDevice(device) {
     return device.hasCapability("ColorControl")
 }
 
-
 def isMotionActive(device) {
     return device.currentMotion == "active"
 }
@@ -631,7 +665,7 @@ def isAnyMotionActive(devices)
 }
 
 
-
+/*
 def getLightValues(lights) {
     lights?.each { light ->
         def switchState = isSwitchOn(light) // On or Off
@@ -640,7 +674,7 @@ def getLightValues(lights) {
         loginfo "Device: ${light.displayName}, Switch: ${switchState}, Brightness: ${brightnessLevel}, Color: ${color ?: 'N/A'}"
     }
 }
-
+*/
 
 /*
 def graduallyChangeLightToLevel(device, targetLevel, duration) {
@@ -663,9 +697,6 @@ def graduallyChangeLightToLevel(device, targetLevel, duration) {
 }
 */
 
-
-
-
 def isTimeBetween(timeStart, timeEnd) {
     def now = new Date()
     def start = parseTime(timeStart)
@@ -684,7 +715,6 @@ def parseTime(timeStr) {
     def now = new Date()
     return new Date(now.year, now.month, now.date, timeParts[0].toInteger(), timeParts[1].toInteger())
 }
-
 
 def hexToHSL(hex) {
     // Remove the # symbol if present
@@ -728,8 +758,6 @@ def hexToHSL(hex) {
     return [hue: h, saturation: s, level: l]
 }
 
-
-
 def getConfig(modename, lightname, statename)
 {
     def result = []
@@ -753,6 +781,7 @@ def getConfig(modename, lightname, statename)
                 base: "${base}",
                 do: "${base}_do",
                 turnon: "${base}_turn_on",
+                forcechange: "${base}_forcechange",
                 brightness: "${base}_brightness",
                 color: "${base}_color",
                 stayon: "${base}_stayon",
@@ -760,6 +789,7 @@ def getConfig(modename, lightname, statename)
                 values: [
                     do: settings["${base}_do"],
                     turnon: settings["${base}_turn_on"],
+                    forcechange: settings["${base}_forcechange"],
                     brightness: settings["${base}_brightness"],
                     color: settings["${base}_color"],
                     stayon: settings["${base}_stayon"],
@@ -781,14 +811,16 @@ def getConfig(modename, lightname, statename)
 
 def allStates()
 {
-    def currentmode = getMode();
+    def currentmode = getMode()
+    def isDarkCombi = ( isDarkSwitch?.currentValue("switch") == "on" || luxSensor?.currentIlluminance < luxThreshold) 
     return [mode:currentmode,
             isvalidmode: (includedModes && includedModes.contains(currentmode)),            
             darkon: isDarkSwitch?.currentValue("switch") == "on",
             lux: luxSensor?.currentIlluminance,
             luxThreshold:luxThreshold,
             luxlow:luxSensor?.currentIlluminance < luxThreshold,
-            isDark: ( isDarkSwitch?.currentValue("switch") == "on" || luxSensor?.currentIlluminance < luxThreshold),
+            isDark: isDarkCombi,
+            isDarkOrNoCfg : isDarkCombi ? "dark" : "no",
             isAnyLightOnMain : isAnySwitchOn(mainlights),
             isAnyLightOnSide : isAnySwitchOn(sidelights),
             isOpenRoomDoor:isAnyContactOn(roomDoors),
