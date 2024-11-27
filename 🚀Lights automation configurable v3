@@ -55,7 +55,7 @@ preferences {
     }      
     section("Settings")
     {
-        input "aboutRoom", "enum", title: "Select room", options: ["h", "lr", "mb", "g", "k", "s", "w"], required: true
+        input "aboutRoom", "enum", title: "Select room", options: ["h", "lr", "mb", "g", "k", "s", "w", "o"], required: true
         //input name: "logPrefix", type: "text", title: "Prefix log", required: true, defaultValue: "⚙️"
         input "logEnable", "bool", title: "Enable extensive logging", required: true
         input "txtEnable", "bool", title: "Enable description text logging.", defaultValue: true, required: true
@@ -131,6 +131,8 @@ def stateGroupArray(){
         ["dark", "motion dark"],
         ["roomdoorsopen", "when room door open"],
         ["housedoorsopen", "when house door open"],
+        ["lightsmanuallyon", "when lights manually on"],
+        
         //["buttonpushed", "when button pushed"],
         //["buttondoublepushed", "when button double pushed"],
         //["istvon", "when tv on"],
@@ -177,7 +179,11 @@ def initialize() {
     subscribe(location, "mode", modeChangedHandler)
     subscribe(isDarkSwitch, "switch.on", switchesHandler)
     subscribe(isDarkSwitch, "switch.off", switchesHandler)
-
+    
+    if(mainlights)
+    {
+        subscribe(mainlights, "switch", lightSwitchesHandler)
+    }
     if(luxSensor)
     {
         subscribe(luxSensor, "illuminance", luxChangedHandler)
@@ -284,10 +290,35 @@ void handleSimpleDoor(manual = "") //CONTACT ON OR OFF
         else if(!states.isOpenRoomDoor)
         {
             mainlights.off()
-            
             unschedule(turnOffLights)
         }         
     }
+}
+
+void handleOffice()
+{
+    def currentMode = getMode()
+    def states = allStates()
+    logdebug("states ${states}", "handleOffice")  
+    if(states.isvalidmode)
+    {
+        if(false)
+        {
+        
+        }   
+        else if(states.isAnyLightOnMain)
+        {
+            def cfg = getConfig(currentMode, "mainlights", "lightsmanuallyon")
+            handleLightsBasedOnConfig(states, cfg, mainlights)
+            
+            runIn(state.stayon, turnOffLights)
+        }    
+        else if(!states.isAnyLightOnMain)
+        {
+            mainlights.off()
+            unschedule(turnOffLights)
+        }         
+    }    
 }
 
 void handleKidsRoom(manual = "") //LEX
@@ -504,7 +535,7 @@ def motionStoppedKeepOnHandler(evt)
     //TEST IF LIGHTS ARE ON?
     if(isAnySwitchOn(mainlights) || isAnySwitchOn(sidelights))
     {
-        if ( ["h","lr","mb","k", "g"].contains(aboutRoom) ) //ROOMS WITH MOTION SENSORS
+        if ( ["h","lr","mb","k", "g", "o"].contains(aboutRoom) ) //ROOMS WITH MOTION SENSORS
         {
             if(state.stayon > 0 && state.stayon != null )
             {
@@ -574,6 +605,15 @@ def switchesHandler(evt)
     {
         //handleHallway()
     }     
+}
+
+
+def lightSwitchesHandler(evt)
+{
+    if(aboutRoom == "o")
+    {
+        handleOffice()
+    }
 }
 
 
