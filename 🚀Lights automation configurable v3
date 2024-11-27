@@ -13,10 +13,45 @@ definition(
 preferences {
     def states = allStates()
     section("INFO") {
-        paragraph "Mode is now <b>${states.mode}</b>"
-        paragraph "Last triggered time is: <b>${state.lasttriggerdt}</b> with \"<b>${state.lasttrigger}</b>\""
-        paragraph "Lux last measured: ${state.lastmeasuredlux}, now: <b>${states.lux}</b> and threshold: <b>${states.luxThreshold}</b>"
-        paragraph "IsDark switch is <b>${states.darkon}</b>"
+        def generalinfo = "";
+        generalinfo += "Mode is now <b>${states.mode}</b>\n"
+        generalinfo += "Last triggered action is: \"<b>${state.lasttrigger}</b>\" on  <b>${state.lasttriggerdt}</b>"
+        paragraph "${generalinfo}"
+        
+        def darkvars = "";
+        darkvars += "Lux last measured: ${state.lastmeasuredlux}, now: <b>${states.lux}</b> and threshold: <b>${states.luxThreshold}</b> and IsDark switch is <b>${states.darkon}</b>\n"
+        darkvars += "Is dark? <b>${states.darkon || (state.lux < states.luxThreshold)}</b>"
+        paragraph "${darkvars}"
+        
+        def motions = "";
+        if(motionSensorsKeepOn)
+        {
+            motionSensorsKeepOn.each { sensor ->
+                 motions += "last motion ${sensor}: <b>${sensor.latestState("motion")?.date.format('yyyy-MM-dd, EEEE, HH:mm:ss')}</b>\n"
+            }
+            paragraph "${motions}"
+        }
+        
+        //def anyOn = devices.find { it.currentValue("switch") == "on" }
+        def lightsstate = ""
+        if(mainlights)
+        {
+            mainlights.each { light ->
+                lightsstate += "${light}: ${light.currentValue("switch")}, ${light.latestState("switch")?.date.format('yyyy-MM-dd, EEEE, HH:mm:ss')} -> ${light.latestState("switch")?.value}\n"
+            }  
+        }
+        if(sidelights)
+        {
+            sidelights.each { light ->
+                lightsstate += "${light}: ${light.currentValue("switch")}, ${light.latestState("switch")?.date.format('yyyy-MM-dd, EEEE, HH:mm:ss')} -> ${light.latestState("switch")?.value}\n"
+            }  
+        }      
+        paragraph "${lightsstate}"
+        
+        paragraph "<br/>All states: <i>${states}</i>"
+        
+        
+        //
     }      
     section("Settings")
     {
@@ -26,18 +61,19 @@ preferences {
         input "txtEnable", "bool", title: "Enable description text logging.", defaultValue: true, required: true
     }
     section("Select devices") {
-        input "motionSensorsTurnOn", "capability.motionSensor", title: "Select motion sensors to turn on light(s)", required: false, multiple: true
-        input "motionSensorsKeepOn", "capability.motionSensor", title: "Select motion sensors to keep on light(s), <b>motion: ${states.isMotion}</b>", required: false, multiple: true
-        input "luxSensor", "capability.illuminanceMeasurement", title: "Select lux sensor, <b>lux measured: ${states.lux}</b>", required: false
-        input "socketPlug", "capability.powerMeter", title: "Select socket plug, power in watts <b>measured: ${states.socketPlugPower}, is using power: ${states.isSocketPlugUsingPower}</b>", required: false
         lightGroupArray().each { grp ->
             def grpName = grp[0]
             def gprDescription = grp[1].toLowerCase()
             input "${grpName}", "capability.switchLevel", title: "Select ${gprDescription}", required: false, multiple: true
         }
+        input "motionSensorsTurnOn", "capability.motionSensor", title: "Select motion sensors to turn on light(s)", required: false, multiple: true
+        input "motionSensorsKeepOn", "capability.motionSensor", title: "Select motion sensors to keep on light(s), <b>motion: ${states.isMotion}</b>", required: false, multiple: true
+        input "luxSensor", "capability.illuminanceMeasurement", title: "Select lux sensor, <b>lux measured: ${states.lux}</b>", required: false
         input "isDarkSwitch", "capability.switch", title: "IsDark Switch, is <b>on: ${states.darkon}</b>", required: false
+
         input "roomDoors", "capability.contactSensor", title: "Room doors, is <b>open: ${states.isOpenRoomDoor}</b>", required: false, multiple: true
         input "houseDoors", "capability.contactSensor", title: "House doors, is <b>open: ${states.isOpenHouseDoor}</b>", required: false, multiple: true
+        input "socketPlug", "capability.powerMeter", title: "Select socket plug, power in watts <b>measured: ${states.socketPlugPower}, is using power: ${states.isSocketPlugUsingPower}</b>", required: false
         input "turnOnButtons", "capability.pushableButton", title: "Which buttons turnon?", required: false, multiple: true
     }
     section("Configs") {
@@ -54,7 +90,7 @@ preferences {
             stateGroupArray().each { state ->
                 def stateName = state[0]
                 def nms = getConfig(mode, grpName, stateName)
-                section("${nms.title} <code style='background-color: yellow'>${nms.base}</code>", hideable: true, hidden: !nms.values.do) {
+                section("${nms.title} <code style='background-color: yellow;'>${nms.base}</code>", hideable: true, hidden: !nms.values.do) {
                     input "${nms.do}", "bool", title: "${nms.statedescription} DO? Otherwise skip actions <code style='background-color: yellow'>${nms.do}</code>", required: true, defaultValue: false
                     input "${nms.turnon}", "bool", title: "${nms.statedescription} turn light on? <code style='background-color: yellow'>${nms.turnon}</code>", required: true, defaultValue: false
                     if(nms.values.turnon)
@@ -76,7 +112,7 @@ def getMode()
     
     if("${mainlights}".contains("TEST"))
     {
-        chosenMode = "SleepAll" 
+        chosenMode = "SleepSome" 
     }
     
     return chosenMode
@@ -93,11 +129,11 @@ def stateGroupArray(){
     return [
         ["no", "motion not dark"],
         ["dark", "motion dark"],
-        ["buttonpushed", "when button pushed"],
-        ["buttondoublepushed", "when button double pushed"],
         ["roomdoorsopen", "when room door open"],
         ["housedoorsopen", "when house door open"],
-        ["istvon", "when tv on"],
+        //["buttonpushed", "when button pushed"],
+        //["buttondoublepushed", "when button double pushed"],
+        //["istvon", "when tv on"],
     ]
 } 
 
@@ -303,12 +339,12 @@ void handleMasterBedroom(manual = "")
         else if(manual == "pushheld")
         {
         }              
-        else if( ["SleepAll", "SleepSome"].contains(currentMode) )
+        else if( ["SleepAll", "SleepSome", "SleepSomeEarlyWorkday"].contains(currentMode) )
         {
             def cfg = getConfig(currentMode, "sidelights", "dark")
             handleLightsBasedOnConfig(states, cfg, sidelights)
         }  
-        else if( ["Normal"].contains(currentMode) )
+        else if( ["Normal", "NormalWorking"].contains(currentMode) )
         {
             sidelights?.off()
             def cfg = getConfig(currentMode, "mainlights", states.isDarkOrNoCfg)
@@ -333,17 +369,17 @@ void handleLivingRoom(manual = "")
         {
         
         }   
-        else if( ["SleepSome"].contains(currentMode) && states.isSocketPlugUsingPower )
+        else if( ["SleepSome", "SleepSomeEarlyWorkday"].contains(currentMode) && states.isSocketPlugUsingPower )
         {
             handleLightsBasedOnConfig(states, getConfig(currentMode, "mainlights", "istvon") , mainlights)
             handleLightsBasedOnConfig(states, getConfig(currentMode, "sidelights", "istvon") , sidelights)
         }  
-        else if( ["SleepSome"].contains(currentMode) && !states.isSocketPlugUsingPower )
+        else if( ["SleepSome","SleepSomeEarlyWorkday"].contains(currentMode) && !states.isSocketPlugUsingPower )
         {
             handleLightsBasedOnConfig( states, getConfig(currentMode, "mainlights", states.isDarkOrNoCfg) , mainlights)
             handleLightsBasedOnConfig( states, getConfig(currentMode, "sidelights", states.isDarkOrNoCfg) , sidelights)
         }  
-        else if( ["Normal"].contains(currentMode) )
+        else if( ["Normal", "NormalWorking"].contains(currentMode) )
         {
             sidelights?.off()
             handleLightsBasedOnConfig(states, getConfig(currentMode, "mainlights", states.isDarkOrNoCfg) , mainlights)
@@ -380,11 +416,13 @@ void handleHallway(manual = "")
         else if(manual == "pushheld")
         {
         }                
-        else if(states.mode == "SleepSome" && states.isOpenHouseDoor && states.isEarlyWorkTime)
+        //else if(states.mode == "SleepSome" && states.isOpenHouseDoor && states.isEarlyWorkTime)
+        //(states.mode == "SleepSome" || states.mode == "SleepSomeEarlyWorkday")
+        else if(states.mode == "SleepSomeEarlyWorkday" && states.isOpenHouseDoor)
         {
             turnOffLights()
         } 
-        else if(states.isOpenHouseDoor && !states.isEarlyWorkTime)
+        else if(states.isOpenHouseDoor && states.mode != "SleepSomeEarlyWorkday")
         {
             sidelights.off()
             
@@ -616,12 +654,12 @@ void turnOnLights(states, configs, lights, comment = "")
 def turnOffLights() {
     mainlights?.off()
     sidelights?.off()
-    loginfo ("Turning off all lights","turnOffLights")
+    loginfo ("Turning off all room lights","turnOffLights")
 }
 
 def turnOffGrpLights(lights) {
     lights?.off()
-    loginfo ("Turning off lights","turnOffGrpLights")
+    loginfo ("Turning off room lights","turnOffGrpLights")
 }
 
 def checkMotionAndTurnOff() {
@@ -663,6 +701,7 @@ def isAnyMotionActive(devices)
     def anyActive = devices.find { it.currentMotion == "active" }
     return anyActive != null
 }
+
 
 
 /*
