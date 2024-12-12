@@ -1,4 +1,6 @@
 import groovy.json.JsonOutput
+import groovy.time.TimeCategory
+import java.text.SimpleDateFormat
 
 definition(
     name: "🚀Lights automation configurable v3",
@@ -14,8 +16,18 @@ preferences {
     def states = allStates()
     section("INFO") {
         def generalinfo = "";
-        generalinfo += "Mode is now <b>${states.mode}</b>\n"
-        generalinfo += "Last triggered action is: \"<b>${state.lasttrigger}</b>\" on  <b>${state.lasttriggerdt}</b>"
+        generalinfo += "Mode is now <b>${states.mode}</b>. "
+        generalinfo += "Triggered on since: \"<b>${state.lasttrigger}</b>\" on  <b>${state.lasttriggertime}</b>\n"
+        generalinfo += "Last Automation since: \"<b>${state.lastautomationtime}</b>\". Turned on manually: ${state.turnedonmanually}. Enabled: ${manuallyOverrideEnable}\n"
+        
+        generalinfo += "Last motion since: \"<b>${state.lastmotiontime}</b>\"\n"
+        generalinfo += "Motionless since: \"<b>${state.motionlesstime}</b>\"\n"
+        generalinfo += "Turning off is: \"<b>${state.turnofftime}</b>\" (${state.stayon}s)\n"
+        generalinfo += "Keep on, motion detected, unscheduled: \"<b>${state.motiondetectedkeeponunscheduletime}</b>\" (${state.stayon}s)\n"
+        generalinfo += "Keep on, motion stopped, unscheduled: \"<b>${state.motionstoppedkeeponunscheduletime}</b>\" (${state.stayon}s)\n"
+        
+        
+        
         paragraph "${generalinfo}"
         
         def darkvars = "";
@@ -27,23 +39,31 @@ preferences {
         if(motionSensorsKeepOn)
         {
             motionSensorsKeepOn.each { sensor ->
-                 motions += "last motion ${sensor}: <b>${sensor.latestState("motion")?.date.format('yyyy-MM-dd, EEEE, HH:mm:ss')}</b>\n"
+                 //motions += "Motion started ${sensor}: <b>${sensor.latestState("motion")?.date.format('yyyy-MM-dd, HH:mm:ss')}</b>\n"
+                motions += "<a target =\"_blank\" href=\"/device/edit/${sensor.id}\">${sensor}</a>: ${sensor.currentValue("motion")}, latest state: ${sensor.latestState("motion")?.date.format('yyyy-MM-dd, HH:mm:ss')} = ${sensor.latestState("motion")?.value}\n"
             }
             paragraph "${motions}"
+            
         }
+        
+        // Convert object to JSON
+        //def jsonOutput = JsonOutput.prettyPrint(JsonOutput.toJson(motionSensorsKeepOn))
+        //paragraph "<br/>All sensor states: <i>${JsonOutput.prettyPrint(jsonOutput)}</i>"
+        
         
         //def anyOn = devices.find { it.currentValue("switch") == "on" }
         def lightsstate = ""
         if(mainlights)
         {
             mainlights.each { light ->
-                lightsstate += "${light}: ${light.currentValue("switch")}, ${light.latestState("switch")?.date.format('yyyy-MM-dd, EEEE, HH:mm:ss')} -> ${light.latestState("switch")?.value}\n"
+                lightsstate += "<a target =\"_blank\" href=\"/device/edit/${light.id}\">${light}</a>: ${light.currentValue("switch")}, latest state: ${light.latestState("switch")?.date.format('yyyy-MM-dd, HH:mm:ss')} = ${light.latestState("switch")?.value}\n"
             }  
         }
         if(sidelights)
         {
             sidelights.each { light ->
-                lightsstate += "${light}: ${light.currentValue("switch")}, ${light.latestState("switch")?.date.format('yyyy-MM-dd, EEEE, HH:mm:ss')} -> ${light.latestState("switch")?.value}\n"
+                //lightsstate += "${light}: ${light.currentValue("switch")}, ${light.latestState("switch")?.date.format('yyyy-MM-dd, HH:mm:ss')} = ${light.latestState("switch")?.value}\n"
+                lightsstate += "<a target =\"_blank\" href=\"/device/edit/${light.id}\">${light}</a>: ${light.currentValue("switch")}, latest state: ${light.latestState("switch")?.date.format('yyyy-MM-dd, HH:mm:ss')} = ${light.latestState("switch")?.value}\n"
             }  
         }      
         paragraph "${lightsstate}"
@@ -60,6 +80,10 @@ preferences {
         input "logEnable", "bool", title: "Enable extensive logging", required: true
         input "txtEnable", "bool", title: "Enable description text logging.", defaultValue: true, required: true
     }
+    section("Settings enable")
+    {
+        input "manuallyOverrideEnable", "bool", title: "Allow manually override. After turning on lights. No automation active until lights are turned off.", defaultValue: true, required: true
+    }    
     section("Select devices") {
         lightGroupArray().each { grp ->
             def grpName = grp[0]
@@ -93,13 +117,13 @@ preferences {
                 section("${nms.title} <code style='background-color: yellow;'>${nms.base}</code>", hideable: true, hidden: !nms.values.do) {
                     input "${nms.do}", "bool", title: "${nms.statedescription} DO? Otherwise skip actions <code style='background-color: yellow'>${nms.do}</code>", required: true, defaultValue: false
                     input "${nms.turnon}", "bool", title: "${nms.statedescription} turn light on? <code style='background-color: yellow'>${nms.turnon}</code>", required: true, defaultValue: false
-                    if(nms.values.turnon)
-                    {
+                    //if(nms.values.turnon)
+                    //{
                         input "${nms.forcechange}", "bool", title: "${nms.statedescription} force change even if lights on? <code style='background-color: yellow'>${nms.forcechange}</code>", required: true, defaultValue: false
                         input "${nms.stayon}", "number", title: "${nms.statedescription} stayon in seconds <code style='background-color: yellow'>${nms.stayon}</code>", required: true, defaultValue: 30
                         input "${nms.brightness}", "number", title: "${nms.statedescription} brightness (0-100)<code style='background-color: yellow'>${nms.brightness}</code>", required: true, defaultValue: 88
                         input "${nms.color}", "color", title: "${nms.statedescription} color <code style='background-color: yellow'>${nms.color}</code>", required: false, defaultValue: "#ffffff"
-                    }
+                    //}
                 }
             }
         }
@@ -173,8 +197,9 @@ def updated() {
 }
 
 def initialize() {
+    def callMethod = "initialize"
     state.logPrefix = "${settings.aboutRoom}"
-    logdebug("initializing...", "initialize")
+    logdebug("initializing...", callMethod)
 
     subscribe(location, "mode", modeChangedHandler)
     subscribe(isDarkSwitch, "switch.on", switchesHandler)
@@ -183,6 +208,13 @@ def initialize() {
     if(mainlights)
     {
         subscribe(mainlights, "switch", lightSwitchesHandler)
+        subscribe(mainlights, "switch.on", lightSwitchedOnHandler)
+        subscribe(mainlights, "switch.off", lightSwitchedOffHandler)
+    }
+    if(sidelights)
+    {
+        subscribe(sidelights, "switch.on", lightSwitchedOnHandler)
+        subscribe(sidelights, "switch.off", lightSwitchedOffHandler)
     }
     if(luxSensor)
     {
@@ -220,21 +252,24 @@ def initialize() {
         subscribe(turnOnButtons, "doubleTapped", buttonTurnOnDoubleTappedHandler)
         subscribe(turnOnButtons, "held", buttonTurnOnHeldHandler)
     }
-    logdebug "subscriptions complete."
+    logdebug ("subscriptions complete.", callMethod)
 
     unschedule(turnOffIfInactive)
+    
+    state.turnedonmanually = false
 }
 //DEBUG
 void spitOut(states, configs)
 {
+    def callMethod = "spitOut"
     logdebug(lightGroupArray()[0][0])
     //config = getConfig("Away", "mainlights", "no")
-    logdebug("config ${configs}", "onMotion")
-    logdebug("isvalidmode ${configs.isvalidmode}", "onMotion")
-    logdebug("state ${states}", "onMotion")
-    logdebug("mode ${states.mode}", "onMotion")
-    logdebug("color ${configs.values.color}", "onMotion")
-    logdebug("room ${aboutRoom}", "onMotion")
+    logdebug("config ${configs}", callMethod)
+    logdebug("isvalidmode ${configs.isvalidmode}", callMethod)
+    logdebug("state ${states}", callMethod)
+    logdebug("mode ${states.mode}", callMethod)
+    logdebug("color ${configs.values.color}", callMethod)
+    logdebug("room ${aboutRoom}", callMethod)
     //["SleepAll", "SleepSome"].contains(getMode())    
     ["g", "k"].contains(aboutRoom)    
 }
@@ -242,9 +277,10 @@ void spitOut(states, configs)
 //LOGICS
 void handleSimpleMotion(manual = "") //LOW LIGHT AND MOTION ON OR OFF
 {
+    def callMethod = "handleSimpleMotion"
     def currentMode = getMode()
     def states = allStates()
-    logdebug("states ${states}", "handleSimpleMotion")   
+    logdebug("states ${states}", callMethod)   
     
     if(states.isvalidmode)
     {
@@ -257,7 +293,7 @@ void handleSimpleMotion(manual = "") //LOW LIGHT AND MOTION ON OR OFF
             sidelights?.off()
             if(states.isAnyLightOnMain)
             {
-                logdebug("skip main lights already on", "onMotion")
+                logdebug("skip main lights already on", callMethod)
             }            
             else
             {
@@ -270,9 +306,10 @@ void handleSimpleMotion(manual = "") //LOW LIGHT AND MOTION ON OR OFF
 
 void handleSimpleDoor(manual = "") //CONTACT ON OR OFF
 {
+    def callMethod = "handleSimpleDoor"
     def currentMode = getMode()
     def states = allStates()
-    logdebug("states ${states}", "handleSimpleDoor")   
+    logdebug("states ${states}", callMethod)   
     
     if(states.isvalidmode)
     {
@@ -297,9 +334,10 @@ void handleSimpleDoor(manual = "") //CONTACT ON OR OFF
 
 void handleOffice()
 {
+    def callMethod = "handleOffice"
     def currentMode = getMode()
     def states = allStates()
-    logdebug("states ${states}", "handleOffice")  
+    logdebug("states ${states}", callMethod)  
     if(states.isvalidmode)
     {
         if(false)
@@ -323,9 +361,10 @@ void handleOffice()
 
 void handleKidsRoom(manual = "") //LEX
 {
+    def callMethod = "handleKidsRoom"
     def currentMode = getMode()
     def states = allStates()
-    logdebug("states ${states}", "handleKidsRoom")   
+    logdebug("states ${states}", callMethod)   
     
     if(states.isvalidmode)
     {
@@ -347,9 +386,10 @@ void handleKidsRoom(manual = "") //LEX
 
 void handleMasterBedroom(manual = "") 
 {
+    def callMethod = "handleMasterBedroom"
     def currentMode = getMode()
     def states = allStates()
-    //logdebug("states ${states}", "handleMasterBedroom")   
+    logdebug("states ${states}", callMethod) 
     
     if(states.isvalidmode)
     {
@@ -390,9 +430,10 @@ void handleMasterBedroom(manual = "")
 
 void handleLivingRoom(manual = "")
 {
+    def callMethod = "handleLivingRoom"
     def currentMode = getMode()
     def states = allStates()
-    logdebug("states ${states}", "handleLivingRoom")   
+    logdebug("states ${states}", callMethod)   
     
     if(states.isvalidmode)
     {
@@ -424,6 +465,7 @@ void handleLivingRoom(manual = "")
 
 void handleHallway(manual = "")
 {
+    def callMethod = "handleHallway"
     def currentMode = getMode()
     def states = allStates()
     //logdebug("states ${states}", "handleHallway")
@@ -472,7 +514,7 @@ void handleHallway(manual = "")
             sidelights.off()
             if(states.isAnyLightOnMain)
             {
-                logdebug("skip main lights already on", "onMotion")
+                logdebug("skip main lights already on", callMethod)
             }            
             else
             {
@@ -485,7 +527,8 @@ void handleHallway(manual = "")
 
 void handleLightsBasedOnConfig(states, configs, lights)
 {
-    logdebug("${states.mode} ➜ <code style='background-color: yellow;'>${configs.base}</code>","handleLightsBasedOnConfig")
+    def callMethod = "handleLightsBasedOnConfig"
+    logdebug("${states.mode} ➜ <code style='background-color: yellow;'>${configs.base}</code>", callMethod)
     if(configs.values.do)
     {
         if( configs.values.turnon && configs.values.forcechange )
@@ -502,7 +545,7 @@ void handleLightsBasedOnConfig(states, configs, lights)
         }
         else
         {
-            logdebug("NO MATCH, ${configs.values}, ${states.lux} < ${states.luxThreshold}? ","handleLightsBasedOnConfig")   
+            logdebug("NO MATCH, ${configs.values}, ${states.lux} < ${states.luxThreshold}?",callMethod)   
         }
     }
 }
@@ -511,26 +554,46 @@ void handleLightsBasedOnConfig(states, configs, lights)
 //EVENTS HANDLERS
 def motionDetectedTurnOnHandler(evt) 
 {
+    def callMethod = "motionDetectedTurnOnHandler"
+    state.lastmotiontime = new Date().format('yyyy-MM-dd, HH:mm:ss')               
+    //loginfo("last motion ${  state.lastmotiontime }", callMethod)  
+    
+    loginfo("motion detected on turn op device, unscheduling checkMotionAndTurnOff", callMethod)
     unschedule(checkMotionAndTurnOff)
+    
     if(aboutRoom == "h"){ handleHallway() }
     else if(aboutRoom == "mb"){ handleMasterBedroom() }
     else if(aboutRoom == "lr"){ handleLivingRoom() }
+    else if(aboutRoom == "o"){ handleOffice() }
     else if ( ["g", "k"].contains(aboutRoom) ) { handleSimpleMotion() }
     //else if ( ["w", "s"].contains(aboutRoom) ) { handleSimpleDoor() }
 }
 
-def motionDetectedKeepOnHandler(evt) 
-{
-  unschedule(checkMotionAndTurnOff)
-}
-
 def motionStoppedTurnOnHandler(evt) 
 {
-    
+    def callMethod = "motionStoppedTurnOnHandler"
 }
+
+
+def motionDetectedKeepOnHandler(evt) 
+{
+    def callMethod = "motionDetectedKeepOnHandler"
+    if(isAnySwitchOn(mainlights) || isAnySwitchOn(sidelights)) //WILL THIS CAUSE TROUBLE?
+    {
+
+    }
+    
+    loginfo("motion detected on keep op device, unscheduling checkMotionAndTurnOff", callMethod)
+    unschedule(checkMotionAndTurnOff)            
+
+    state.motiondetectedkeeponunscheduletime = new Date().format('yyyy-MM-dd, HH:mm:ss')               
+}
+
+
 
 def motionStoppedKeepOnHandler(evt) 
 {
+    def callMethod = "motionStoppedKeepOnHandler"
     //def configs = getConfig(getMode(), "mainlights", "dark")
     //TEST IF LIGHTS ARE ON?
     if(isAnySwitchOn(mainlights) || isAnySwitchOn(sidelights))
@@ -540,8 +603,17 @@ def motionStoppedKeepOnHandler(evt)
             if(state.stayon > 0 && state.stayon != null )
             {
                 unschedule(checkMotionAndTurnOff)
+                state.motionstoppedkeeponunscheduletime = new Date().format('yyyy-MM-dd, HH:mm:ss')               
+                
                 runIn(state.stayon, checkMotionAndTurnOff)
-                //loginfo("lights off in ${state.stayon}s", "motionStoppedKeepOnHandler")
+                
+                loginfo("lights off in ${state.stayon}s", callMethod)
+                
+                state.motionlesstime = new Date().format('yyyy-MM-dd, HH:mm:ss');               
+                loginfo("motionless ${  state.motionlesstime }", callMethod)
+                def newTime = new Date(new Date().time + (state.stayon * 1000)) 
+                state.turnofftime = newTime.format('yyyy-MM-dd, HH:mm:ss')
+                loginfo("lights will go off at ${  state.turnofftime }", callMethod)
             }    
             else
             {
@@ -553,6 +625,7 @@ def motionStoppedKeepOnHandler(evt)
 
 def powerChangedHandler(evt)
 {
+    def callMethod = "powerChangedHandler"
     def currentPower = evt.value as Double  // Current power usage in watts
     def lastPower = state.lastPower ?: 0    // Previous power usage stored in state
     // Check if the change exceeds 30 watts
@@ -560,9 +633,9 @@ def powerChangedHandler(evt)
 
     if (powerDifference > 30) 
     {
-        logdebug ("powerChanged: ${evt.value}","powerChangedHandler")
-        logdebug "Power change detected: current = ${currentPower}W, previous = ${lastPower}W, difference = ${powerDifference}W, threshold = ${powerThreshold}"
-        logdebug "Power change exceeds 30W, taking action"
+        logdebug ("powerChanged: ${evt.value}","powerChangedHandler", callMethod)
+        logdebug ("Power change detected: current = ${currentPower}W, previous = ${lastPower}W, difference = ${powerDifference}W, threshold = ${powerThreshold}",callMethod)
+        logdebug ("Power change exceeds 30W, taking action",callMethod)
         if(aboutRoom == "lr"){ handleLivingRoom() }
     }
 
@@ -570,6 +643,7 @@ def powerChangedHandler(evt)
 
 def luxChangedHandler(evt) 
 {
+    def callMethod = "luxChangedHandler"
     /*
     def anylightson = isAnySwitchOn(mainlights)
     logdebug ("lux level ${evt?.displayName} (virt: ${isVirtual(evt?.device)}) changed to ${evt.value}, threshold is ${luxThreshold}, any lights on: ${anylightson}", "luxChangedHandler")
@@ -592,6 +666,7 @@ def luxChangedHandler(evt)
 
 def switchesHandler(evt)
 {
+    def callMethod = "switchesHandler"
     /*
     def anylightson = isAnySwitchOn(mainlights)
     logdebug ("switch change ${evt?.displayName} (virt: ${isVirtual(evt?.device)}) changed to ${evt.value}, any lights on: ${anylightson}", "switchesHandler")
@@ -608,8 +683,41 @@ def switchesHandler(evt)
 }
 
 
+def lightSwitchedOnHandler(evt)
+{
+    def callMethod = "lightSwitchedOnHandler"
+    loginfo("manuallyOverrideEnable: ${manuallyOverrideEnable}", callMethod)
+    if(manuallyOverrideEnable)
+    {
+        def nowTime = now()
+        def lastAutomation = state.lastautomation ?: 0
+        def elapsedTime = nowTime - lastAutomation
+
+        if (elapsedTime > 3000) // 3 seconds threshold for "manual" assumption
+        { 
+            loginfo("Light was turned on manually.", callMethod)
+            state.turnedonmanually = true
+            // Add your manual action handling here
+        } else {
+            loginfo("Light was turned on automatically.", callMethod)
+        }      
+    }
+}
+
+def lightSwitchedOffHandler(evt)
+{
+    def callMethod = "lightSwitchedOffHandler"
+    if(state.turnedonmanually)
+    {
+        loginfo("Light turned off manually. Resetting automation flag.", callMethod)
+    }
+    state.turnedonmanually = false
+}
+
+
 def lightSwitchesHandler(evt)
 {
+    def callMethod = "lightSwitchesHandler"
     if(aboutRoom == "o")
     {
         handleOffice()
@@ -618,15 +726,16 @@ def lightSwitchesHandler(evt)
 
 
 def modeChangedHandler(evt) {
+    def callMethod = "modeChangedHandler"
     //logdebug("mode to <b>${evt.displayName}</b>", "modeChangedHandler")
     def currentMode = getMode()
-    logdebug("mode to <b>${currentMode}</b>", "modeChangedHandler")
+    logdebug("mode to <b>${currentMode}</b>", callMethod)
     
     def states = allStates()
     if( ["SleepAll", "Away"].contains(currentMode))
     {
         turnOffLights()
-        logdebug("mode = ${currentMode}, all lights off","modeChangedHandler(evt)")
+        logdebug("mode = ${currentMode}, all lights off",callMethod)
     }     
     else if( ["SleepSome"].contains(currentMode) && ["h","mb"].contains(aboutRoom))
     {
@@ -636,7 +745,8 @@ def modeChangedHandler(evt) {
 
 def roomDoorsHandler(evt) 
 {
-    logdebug("${evt.device} IS ${isContactOn(evt.device) ? "OPEN" : "DICHT"} : ${evt?.value}", "roomDoorsHandler")
+    def callMethod = "roomDoorsHandler"
+    logdebug("${evt.device} IS ${isContactOn(evt.device) ? "OPEN" : "DICHT"} : ${evt?.value}", callMethod)
     //if(isContactOn(evt.device))
     
     if(aboutRoom == "h"){ handleHallway() }
@@ -645,24 +755,31 @@ def roomDoorsHandler(evt)
 
 def houseDoorsHandler(evt) 
 {
-    logdebug("${evt.device} IS ${isContactOn(evt.device) ? "OPEN" : "DICHT"} : ${evt?.value}", "houseDoorsHandler")
+    def callMethod = "houseDoorsHandler"
+    logdebug("${evt.device} IS ${isContactOn(evt.device) ? "OPEN" : "DICHT"} : ${evt?.value}", callMethod)
     if(aboutRoom == "h"){ handleHallway() }
 }
 
-def buttonTurnOnPushedHandler(evt) {
-    //logdebug("button ${evt?.displayName} ${evt?.value}", "buttonTurnOnPushedHandler")
+def buttonTurnOnPushedHandler(evt) 
+{
+    def callMethod = "buttonTurnOnPushedHandler"
+    logdebug("button ${evt?.displayName} ${evt?.value}", callMethod)
     if(aboutRoom == "h"){ handleHallway("pushsingle") }
     else if(aboutRoom == "mb"){ handleMasterBedroom("pushsingle") }  
 }
 
-def buttonTurnOnDoubleTappedHandler(evt) {
-    //logdebug("button ${evt?.displayName} ${evt?.value}", "buttonTurnOnDoubleTappedHandler")
+def buttonTurnOnDoubleTappedHandler(evt) 
+{
+    def callMethod = "buttonTurnOnDoubleTappedHandler"
+    logdebug("button ${evt?.displayName} ${evt?.value}", callMethod)    
     if(aboutRoom == "h"){ handleHallway("pushdouble") }
     else if(aboutRoom == "mb"){ handleMasterBedroom("pushdouble") }  
 }
 
-def buttonTurnOnHeldHandler(evt) {
-    //logdebug("button ${evt?.displayName} ${evt?.value}", "buttonTurnOnHeldHandler")
+def buttonTurnOnHeldHandler(evt) 
+{
+    def callMethod = "buttonTurnOnHeldHandler"
+    logdebug("button ${evt?.displayName} ${evt?.value}", callMethod)    
     if(aboutRoom == "h"){ handleHallway("pushheld") }
     else if(aboutRoom == "mb"){ handleMasterBedroom() }
 }
@@ -670,8 +787,11 @@ def buttonTurnOnHeldHandler(evt) {
 //LIGHTS
 void turnOnLights(states, configs, lights, comment = "")
 {
+    def callMethod = "turnOnLights"
+    state.lastautomation = now()
+    state.lastautomationtime = new Date().format('yyyy-MM-dd, HH:mm:ss')
     state.lasttrigger = configs.base
-    state.lasttriggerdt = new Date().format('yyyy-MM-dd, EEEE, HH:mm:ss')
+    state.lasttriggertime = new Date().format('yyyy-MM-dd, HH:mm:ss')
     state.lastmeasuredlux = states.lux
     state.stayon = configs.values.stayon
     lights.each { light ->
@@ -679,36 +799,65 @@ void turnOnLights(states, configs, lights, comment = "")
         {
             def hsl = hexToHSL(configs.values.color)
             light.setColor([hue: hsl.hue, saturation: hsl.saturation, level: configs.values.brightness])
-            //logdebug "hsl: ${hsl}"
+            logdebug ("hsl: ${hsl}", callMethod)
         }
         else
         {
             light.setLevel(configs.values.brightness)
+            logdebug ("level: ${configs.values.brightness}", callMethod)
         }
         //logdebug "[${allStates().collect { "${it.key} : ${it.value}" }.join("] [")}]"
         //loginfo "ON ${light.displayName} [${light.collect { "${it.key} : ${it.value}" }.join("] [")}]"        
-        loginfo("ON ${light.displayName} [${configs.do}], ${comment}", "turnOnLights")
+        loginfo("ON ${light.displayName} [${configs.do}], ${comment}", callMethod)
     }      
 }
 
-def turnOffLights() {
-    mainlights?.off()
-    sidelights?.off()
-    loginfo ("Turning off all room lights","turnOffLights")
+def turnOffLights() 
+{
+    def callMethod = "turnOffLights"
+    if(state.turnedonmanually)
+    {
+        loginfo("Automation attempted to turn off the light, but it was left on due to manual override.", callMethod)
+    }
+    else
+    {
+        mainlights?.off()
+        sidelights?.off()
+        loginfo ("Turning off all room lights automatically",callMethod)    
+    }
 }
 
-def turnOffGrpLights(lights) {
-    lights?.off()
-    loginfo ("Turning off room lights","turnOffGrpLights")
+def turnOffGrpLights(lights) 
+{
+    def callMethod = "turnOffGrpLights"
+    if(state.turnedonmanually)
+    {
+        loginfo("Automation attempted to turn off the light, but it was left on due to manual override.",callMethod)
+    }
+    else    
+    {
+        lights?.off()
+        loginfo ("Turning off room lights automatically",callMethod)    
+    }
 }
 
-def checkMotionAndTurnOff() {
-    if (!isAnyMotionActive(motionSensorsKeepOn)) {
+def checkMotionAndTurnOff() 
+{
+    def callMethod = "checkMotionAndTurnOff"
+
+    if (!isAnyMotionActive(motionSensorsKeepOn)) 
+    {
+        loginfo ("No motion, turning off",callMethod)    
         turnOffLights()
-    } else {
+        unschedule(checkMotionAndTurnOff)
+    } 
+    else 
+    {
+        unschedule(checkMotionAndTurnOff)
+        loginfo ("Motion, rescheduling turning off",callMethod)    
         runIn(state.stayon, checkMotionAndTurnOff) // Check again after 1 minute if motion persists
     }
-    unschedule(checkMotionAndTurnOff)
+    
 }
 
 //SMALL FUNCTIONS
@@ -839,6 +988,7 @@ def hexToHSL(hex) {
 
 def getConfig(modename, lightname, statename)
 {
+    def callMethod = "getConfig"
     def result = []
 
     if ([lightname, statename, modename].every { it != null }) 
@@ -878,7 +1028,7 @@ def getConfig(modename, lightname, statename)
         }
         else
         {
-            logdebug "❌not found in arrays, modename: ${modename}, lightname : ${lightname} : ${isValidLight}, statename: ${statename} : ${isValidState}"
+            logdebug ("❌not found in arrays, modename: ${modename}, lightname : ${lightname} : ${isValidLight}, statename: ${statename} : ${isValidState}", callMethod)
         }
     }
     else
