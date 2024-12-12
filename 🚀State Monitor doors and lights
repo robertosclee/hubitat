@@ -32,8 +32,8 @@ preferences {
         input "sendSMS", "phone", title: "Send SMS Notification to this number (optional)", required: false
         input "sendCustomMessage", "capability.notification", title: "Send to custom notification device (optional)", multiple: true, required: false
     }
-    section("Scheduled ALARM Notification") {
-        input "sendCustomScheduledMessage", "capability.notification", title: "Send to ALARM notifications device (optional)", multiple: true, required: false
+    section("Scheduled Notification") {
+        input "sendCustomScheduledMessage", "capability.notification", title: "Scheduled send to notifications device (optional)", multiple: true, required: false
     }    
     section("Actions:") {
         input name: "testButton", type: "button", title: "Test", submitOnChange: true
@@ -56,19 +56,34 @@ def initialize() {
     if (doors) {
         subscribe(doors, "contact", stateChangeHandler)
     }
-    if (motionsensors) 
-    {
+    if (motionsensors) {
        subscribe(motionsensors, "motion", motionHandler)
     }
     if (manualMotionTrigger) {
         subscribe(manualMotionTrigger, "switch.on", manualMotionHandler)
     }
     
-    subscribe(manualLightsOffTrigger, "switch.on", manualLightsOffTriggerHandler)
+    subscribe(manualLightsOffTrigger, "switch", manualLightsOffTriggerHandler)
 
+    subscribe(location, "mode", modeChangeHandler)
     
     // Schedule the check
     runIn(1, scheduledCheck)    
+}
+
+def modeChangeHandler(evt) {
+    log.debug "Mode changed to: ${evt.value}"
+    sendCustomMessage.deviceNotification("Mode changed to: ${evt.value}")
+    if (location.mode == "SleepAll")
+    {
+        def excludePartialNames = ["kids"]
+        turnOffLightsExcept(excludePartialNames)
+    }    
+    if (location.mode == "Away")
+    {
+        def excludePartialNames = []
+        turnOffLightsExcept(excludePartialNames)
+    }        
 }
 
 def appButtonHandler(buttonName) {
@@ -87,20 +102,82 @@ def manualMotionHandler(evt)
     //runIn(60*15, scheduledCheck)
 }
 
-def manualLightsOffTriggerHandler(evt) 
-{
-     //log.debug "Button ${evt.device.displayName} was pushed---"
-    //log.debug "lights ${lights}" 
-    def lightsOn = lights ? lights.findAll { it.currentSwitch == "on" }.sort { a, b -> a.displayName <=> b.displayName } : []
+def turnOffLightsExcept(excludePartialNames = []) {
+    def lightsOn = lights ? lights.findAll { 
+        it.currentSwitch == "on" && 
+        !excludePartialNames.any { partial -> it.displayName.contains(partial) }
+    }.sort { a, b -> a.displayName <=> b.displayName } : []
     def lightsOnNames = lightsOn.collect { it.displayName }.join(", ")
     log.debug "Turning off ${lights.size()} lights" 
     sendCustomMessage.deviceNotification("Turning off ${lightsOn.size()} lights, ${lightsOnNames}")
+    lightsOn.each { light ->
+        light.off() // Turns off the light
+    } 
+}
+
+def manualLightsOffTriggerHandler(evt) 
+{
+    //log.debug "Button ${evt.device.displayName} was pushed---"
+    //log.debug "lights ${lights}" 
+    def lightsOn = lights ? lights.findAll { it.currentSwitch == "on" }.sort { a, b -> a.displayName <=> b.displayName } : []
+    def lightsOnNames = lightsOn.collect { it.displayName }.join(", ")
+    log.debug "Turning off all ${lights.size()} lights in house" 
+    sendCustomMessage.deviceNotification("Turning off all ${lightsOn.size()} lights\n#watcher, ${lightsOnNames}")
     lightsOn.each { light ->
         light.off() // Turns off the light
         //log.debug "❌${light.displayName} turned off"
         //sendCustomMessage.deviceNotification("❌${light.displayName} turned off")
     }    
 }
+
+
+
+def dimLightsGradually(lights, durationMinutes = 1, steps = 10) {
+    if (!lights || lights.isEmpty()) {
+        log.warn "No lights specified to dim."
+        return
+    }
+    
+    // Calculate the time between each step
+    def stepInterval = (durationMinutes * 60 * 1000) / steps // Convert minutes to milliseconds
+    def stepLevel = 100 / steps // Brightness level reduction per step
+    
+    // Start the dimming process
+    def dimStep = { int currentStep ->
+        if (currentStep > steps) {
+            // Turn off the lights after the final step
+            lights.each { it.off() }
+            log.info "All lights turned off after dimming."
+        } else {
+            // Calculate the target brightness level for this step
+            def targetLevel = Math.max(0, 100 - (currentStep * stepLevel))
+            log.debug "Dimming lights to ${targetLevel}% at step ${currentStep}."
+            
+            // Set the brightness for each light
+            lights.each { light ->
+                if (light.hasCommand("setLevel")) {
+                    light.setLevel(targetLevel)
+                } else {
+                    log.warn "${light.displayName} does not support setLevel command."
+                }
+            }
+            
+            // Schedule the next dimming step
+            runInMillis(stepInterval, dimStep, [data: [currentStep: currentStep + 1]])
+        }
+    }
+    
+    // Start the process
+    log.info "Starting dimming process for lights over ${durationMinutes} minutes in ${steps} steps."
+    dimStep(1)
+}
+
+
+
+
+
+
+
 
 
 def motionHandler(evt) 
@@ -185,6 +262,7 @@ def checkStateAndNotify(data)
 
     if (message) 
     {
+        /*
         if (sendPush) 
         {
             log.debug "sendPush"
@@ -194,6 +272,7 @@ def checkStateAndNotify(data)
         {
             sendSms(sendSMS, message)
         }
+        */
         if (sendCustomMessage) 
         {
             //log.debug "sendCustomMessage"
