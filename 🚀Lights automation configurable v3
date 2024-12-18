@@ -13,91 +13,177 @@ definition(
     iconX2Url: ""
 )
 
-
-
-preferences {
+preferences 
+{
     def states = allStates()
-    section("INFO") {
-        def generalinfo = "<table border='1'>"
-        generalinfo += "<tr><td colspan='3'>Mode is now <b>${states.mode}</b></td></tr>"
-        generalinfo += "<tr><td>Last triggered: <a href='#${state.lasttrigger}'><b>${state.lasttrigger}</b></a></td><td>${getFormatted("lasttriggertime")}</td><td>forced: ${state.forced}</td></tr>\n"
-        generalinfo += "<tr><td>Last Automation</td><td>${getFormatted("lastautomationtime")}</td><td>Enabled: ${manuallyOverrideEnable}</td></tr>"
-        
-        generalinfo += "<tr><td>Last motion</td><td>${getFormatted("lastmotiontime")}</td><td></td></tr>"
-        generalinfo += "<tr><td>Motionless</td><td>${getFormatted("motionlesstime")}</td><td></td></tr>"
+    section("INFO", hideable: true, hidden: false) 
+    {
+        paragraph """<style>
+table 
+{
+border-collapse: collapse;
+border: 1px solid black;
+padding: 0;
+margin: 0;
+}
+th, td 
+{
+border: 1px solid black;
+padding: 4px 2px 2px 2px;
+text-align: left;
+}
 
-        //generalinfo += "<tr><td><br/><br/></td><td><b>dt</b></td><td><b>stayon</b></td></tr>"
-        generalinfo += "<tr><td>Turning off at</td><td>${getFormatted("turnofftime")}</td><td>stayon: ${state.stayon}s</td></tr>"
-        generalinfo += "<tr><td>Keep on, motion detected, unscheduled</td><td>${getFormatted("motiondetectedkeeponunscheduletime")}</td><td></td></tr>"
-        generalinfo += "<tr><td>Keep on, motion stopped, unscheduled</td><td>${getFormatted("motionstoppedkeeponunscheduletime")}</td><td></td></tr>"
-        
-        //generalinfo += "Last Automation since: \"<b>${state.lastautomationtime}</b>\". Turned on manually: ${state.turnedonmanually}. Enabled: ${manuallyOverrideEnable}, ${humanizeDatetime(state.lastautomationtime)} \n"
-        
-        //generalinfo += "Last Automation since: <b>${getFormatted("lastautomationtime")}</b>. Turned on manually: ${state.turnedonmanually}. Enabled: ${manuallyOverrideEnable}, ${getHumanize("lastautomationtime")} \n"
-        
-        //generalinfo += "Last motion since: \"<b>${state.lastmotiontime}</b>\", ${humanizeDatetime(state.lastmotiontime)} \n"
-        //generalinfo += "Motionless since: \"<b>${state.motionlesstime}</b>\", ${humanizeDatetime(state.motionlesstime)} \n"
-        //generalinfo += "Turning off at: \"<b>${state.turnofftime}</b>\" (${state.stayon}s), ${humanizeDatetime(state.turnofftime)} \n"
-        //generalinfo += "Keep on, motion detected, unscheduled: \"<b>${state.motiondetectedkeeponunscheduletime }</b>\" (${state.stayon}s), ${humanizeDatetime(state.motiondetectedkeeponunscheduletime)} \n"
-        //generalinfo += "Keep on, motion stopped, unscheduled: \"<b>${state.motionstoppedkeeponunscheduletime}</b>\" (${state.stayon}s), ${humanizeDatetime(state.motionstoppedkeeponunscheduletime)} \n"
-        /*
-        generalinfo += "Last motion since: \"<b>${getFormatted("lastmotiontime")}</b>\", ${getHumanize("lastmotiontime")} \n"
-        generalinfo += "Motionless since: \"<b>${getFormatted("motionlesstime")}</b>\", ${getHumanize("motionlesstime")} \n"
-        generalinfo += "Turning off at: \"<b>${getFormatted("turnofftime")}</b>\" (${state.stayon}s), ${getHumanize("turnofftime")} \n"
-        generalinfo += "Keep on, motion detected, unscheduled: \"<b>${getFormatted("motiondetectedkeeponunscheduletime") }</b>\" (${state.stayon}s), ${getHumanize("motiondetectedkeeponunscheduletime")} \n"
-        generalinfo += "Keep on, motion stopped, unscheduled: \"<b>${getFormatted("motionstoppedkeeponunscheduletime")}</b>\" (${state.stayon}s), ${getHumanize("motionstoppedkeeponunscheduletime")} \n"
-        */
+th 
+{
+padding: 2px;
+background-color: #f2f2f2;
+}
+
+table.noborder,
+table.noborder th, 
+table.noborder td 
+{
+border: 0px solid black;
+padding: 0px;
+margin: 0px;
+}
+
+.ninja
+{
+display:none;
+}
+</style>"""
+
+        def generalinfo = "<table>"
+        generalinfo += "<tr><td colspan='3'>Mode is now <b>${states.mode}</b> ${states.mode != location.mode ? " (TEST), real mode: <b>${location.mode}</b>" : ""}, since ${getFormatted("modechangedtime")}</td></tr>"
+        generalinfo += "<tr><td colspan='3'>Last automated triggered: <a href='#${state.lasttrigger}'><b>${state.lasttrigger}</b></a> ${getFormatted("lastautomationtime")}</td></tr>\n"
+        if(manuallyOverrideEnable)
+        {
+            generalinfo += "<tr><td colspan='2'>Was turned on manually: ${state.turnedonmanually}</td><td>Skipped turning off: ${state.skippedTurningOff}</td></tr>\n"
+        }
+        else
+        {
+            generalinfo += "<tr><td colspan='3'>Manual mode not enabled</td></tr>\n"            
+        }
+        generalinfo += "<tr><td>Forced brightness turn on: ${state.forced}</td><td></td><td></td></tr>\n"
+        generalinfo += "<tr><td>Last motion</td><td>${getFormatted("lastmotiontime")}</td><td></td></tr>"
+        generalinfo += "<tr><td>Motionless since</td><td>${isAnyMotionActive(motionSensorsKeepOn) ? "" : getFormatted("motionlesstime")}</td><td></td></tr>"
+        generalinfo += "<tr><td>Turning off at</td><td>${state.turnofftime > nowTime() ? getFormatted("turnofftime") : ""}</td><td>stayon: ${state.stayon}s</td></tr>"
+
         generalinfo += "</table>";
         paragraph "${generalinfo}"
-        
+
         def darkvars = "";
         darkvars += "Lux last measured: ${state.lastmeasuredlux}, now: <b>${states.lux}</b> and threshold: <b>${states.luxThreshold}</b> and IsDark switch is <b>${states.darkon}</b>\n"
         darkvars += "Is dark? <b>${states.darkon || (state.lux < states.luxThreshold)}</b>"
         paragraph "${darkvars}"
-        
-        
-        def motions = "<table border='1'>"
+
+
+        def motions = "<table>"
         if(motionSensorsKeepOn)
         {
+            motions += "<tr>"
+            motions += "<th></th>"
+            motions += "<th>last change</th>"
+            motions += "<th>state</th>"
+            motions += "<th>temp</th>"
+            motions += "<th>illuminance</th>"
+            motions += "<th>bat</th>"
+            motions += "<th>humanMotionState</th>"
+            motions += "<th>Status</th>"
+            motions += "<th>powerSource</th>"
+            motions += "</tr>"               
             motionSensorsKeepOn.each { sensor ->
-                 //motions += "Motion started ${sensor}: <b>${sensor.latestState("motion")?.date.format('yyyy-MM-dd, HH:mm:ss')}</b>\n"
+                //motions += "Motion started ${sensor}: <b>${sensor.latestState("motion")?.date.format('yyyy-MM-dd, HH:mm:ss')}</b>\n"
                 //motions += "<a target =\"_blank\" href=\"/device/edit/${sensor.id}\">${sensor}</a>: ${sensor.currentValue("motion")}, latest state: ${sensor.latestState("motion")?.date.format('yyyy-MM-dd, HH:mm:ss')} = ${sensor.latestState("motion")?.value}, ${humanizeDatetime(sensor.latestState("motion")?.date)} \n"
-                motions += "<tr><td><a target =\"_blank\" href=\"/device/edit/${sensor.id}\">${sensor}</a></td><td>${sensor.latestState("motion")?.date.format('yyyy-MM-dd, HH:mm:ss')} (${humanizeDatetime(sensor.latestState("motion")?.date)})</td><td>${sensor.currentValue("motion")}</td></tr>"
+                motions += "<tr>"
+                motions += "<td><a target =\"_blank\" href=\"/device/edit/${sensor.id}\">${sensor}</a></td>"
+                motions += "<td>${sensor.latestState("motion")?.date.format('HH:mm:ss.SSS')} (${humanizeDatetime(sensor.latestState("motion")?.date)})</td></td>"
+                motions += "<td>${sensor.latestState("motion")?.value}</td>"
+                motions += "<td>${sensor.hasAttribute("temperature") ? sensor.currentValue("temperature") + " °C" : ""}</td>"
+                motions += "<td>${sensor.currentValue("illuminance")  ?: '' }</td>"
+                motions += "<td>${sensor.currentValue("battery")  ?: '' }</td>"
+                motions += "<td>${sensor.currentValue("humanMotionState") ?: '' }</td>"
+                motions += "<td>${sensor.currentValue("Status")  ?: '' }</td>"
+                motions += "<td>${sensor.currentValue("powerSource")  ?: '' }</td>"
+                motions += "</tr>"
             }
             motions += "</table>";
             paragraph "${motions}"
-            
         }
-        
+
+
+        def contactsstate = "<table>"
+        def allContactSensors = (roomDoors ?: []) + (houseDoors ?: [])
+        allContactSensors = allContactSensors.unique() // Remove duplicates
+        contactsstate += "<tr>"
+        contactsstate += "<th></th>"
+        contactsstate += "<th>last change</th>"
+        contactsstate += "<th>state</th>"
+        contactsstate += "<th>bat</th>"
+        //contactsstate += "<th>tamper</th>"
+        contactsstate += "</tr>"        
+        allContactSensors.each { contact ->
+            contactsstate += "<tr>"
+            contactsstate += "<td><a target =\"_blank\" href=\"/device/edit/${contact.id}\">${contact}</a></td>"
+            contactsstate += "<td>${contact.latestState("contact")?.date.format('HH:mm:ss.SSS')} (${humanizeDatetime(contact.latestState("contact")?.date)})</td>"
+            contactsstate += "<td>${contact.currentValue("contact")}</td>"
+            contactsstate += "<td>${contact.currentValue("battery")  ?: '' }</td>"
+            //contactsstate += "<td>${contact.currentValue("tamper")}</td>"
+            contactsstate += "</tr>"
+        }  
+        contactsstate += "</table>";
+        paragraph "${contactsstate}"
+
         // Convert object to JSON
         //def jsonOutput = JsonOutput.prettyPrint(JsonOutput.toJson(motionSensorsKeepOn))
         //paragraph "<br/>All sensor states: <i>${JsonOutput.prettyPrint(jsonOutput)}</i>"
-        
-        
+
+
         //def anyOn = devices.find { it.currentValue("switch") == "on" }
         //def lightsstate = ""
-        def lightsstate = "<table border='1'>"
-        if(mainlights)
-        {
-            mainlights.each { light ->
-                //lightsstate += "<a target =\"_blank\" href=\"/device/edit/${light.id}\">${light}</a>: ${light.currentValue("switch")}, latest state: ${light.latestState("switch")?.date.format('yyyy-MM-dd, HH:mm:ss')} = ${light.latestState("switch")?.value}, ${humanizeDatetime(light.latestState("switch")?.date)} \n"
-                lightsstate += "<tr><td><a target =\"_blank\" href=\"/device/edit/${light.id}\">${light}</a></td><td>${light.latestState("switch")?.date.format('yyyy-MM-dd, HH:mm:ss')} (${humanizeDatetime(light.latestState("switch")?.date)})</td><td>${light.currentValue("switch")}</td></tr>"
-            }  
-        }
-        if(sidelights)
-        {
-            sidelights.each { light ->
-                //lightsstate += "${light}: ${light.currentValue("switch")}, ${light.latestState("switch")?.date.format('yyyy-MM-dd, HH:mm:ss')} = ${light.latestState("switch")?.value}\n"
-                //lightsstate += "<a target =\"_blank\" href=\"/device/edit/${light.id}\">${light}</a>: ${light.currentValue("switch")}, latest state: ${light.latestState("switch")?.date.format('yyyy-MM-dd, HH:mm:ss')} = ${light.latestState("switch")?.value}, ${humanizeDatetime(light.latestState("switch")?.date)} \n"
-                lightsstate += "<tr><td><a target =\"_blank\" href=\"/device/edit/${light.id}\">${light}</a></td><td>${light.latestState("switch")?.date.format('yyyy-MM-dd, HH:mm:ss')} (${humanizeDatetime(light.latestState("switch")?.date)})</td><td>${light.currentValue("switch")}</td></tr>"
-            }  
-        }      
+        def lightsstate = "<table>"
+        def allLights = (mainlights ?: []) + (sidelights ?: [])
+        allLights = allLights.unique() // Remove duplicates
+        lightsstate += "<tr>"
+        lightsstate += "<th></th>"
+        lightsstate += "<th>last on</th>"
+        lightsstate += "<th>switch</th>"
+        lightsstate += "<th>level</th>"
+        lightsstate += "<th>colorTemperature</th>"
+        lightsstate += "<th>colorMode</th>"
+        lightsstate += "<th>colorName</th>"
+        lightsstate += "<th>color</th>"
+        lightsstate += "<th>saturation</th>"
+        lightsstate += "<th>hue</th>"
+        lightsstate += "</tr>"        
+        allLights.each { light ->
+            //def attributes = light.getSupportedAttributes()
+            //lightsstate += "attribs : ${attributes}"
+            lightsstate += "<tr>"
+            lightsstate += "<td><a target =\"_blank\" href=\"/device/edit/${light.id}\">${light}</a></td>"
+            lightsstate += "<td>${light.latestState("switch")?.date.format('HH:mm:ss.SSS')} (${humanizeDatetime(light.latestState("switch")?.date)})</td>"
+            lightsstate += "<td>${light.currentValue("switch")}</td>"
+            lightsstate += "<td>${light.currentValue("level")  ?: '' }</td>"
+            lightsstate += "<td>${light.currentValue("colorTemperature")  ?: '' }</td>"
+            lightsstate += "<td>${light.currentValue("colorMode")  ?: '' }</td>"
+            lightsstate += "<td>${light.currentValue("colorName")  ?: '' }</td>"
+            lightsstate += "<td>${light.currentValue("color")  ?: '' }</td>"
+            lightsstate += "<td>${light.currentValue("saturation")  ?: '' }</td>"
+            lightsstate += "<td>${light.currentValue("hue")  ?: '' }</td>"
+            lightsstate += "</tr>"
+        }  
         lightsstate += "</table>";
         paragraph "${lightsstate}"
-        
-        paragraph "<br/>All states:\n<i>${states}</i>"
-        
-        def allstate = "<table border='1'>"
+    }
+    section("STATES ALL", hideable: true, hidden: true)
+    {
+        def allstate = "<table>"
+        allstate += "<tr><th colspan='2'>OWN</th></tr>"
+        states.each { key, value ->
+            allstate += "<tr><td>${key}</td><td>${states[key]}</td></tr>"
+        }        
+        allstate += "<tr><th colspan='2'>HUBITAT</th></tr>"
         state.each { key, value ->
             //state[key] = null // Reset each state variable to null
             //allstate += "${key} : ${state[key]} = ${  (state[key]  instanceof Date)  }\n" 
@@ -105,21 +191,20 @@ preferences {
         }
         allstate += "</table>";
         paragraph "<br/>All state:\n${allstate}"
-        
-        //
-    }      
-    section("Settings")
+    }     
+    section("Settings", hideable: true, hidden: false)
     {
+        input "includedModes", "mode", title: "Applicable modes", multiple: true, required: false
         input "aboutRoom", "enum", title: "Select room", options: ["h", "lr", "mb", "g", "k", "s", "w", "o"], required: true
         //input name: "logPrefix", type: "text", title: "Prefix log", required: true, defaultValue: "⚙️"
         input "logEnable", "bool", title: "Enable extensive logging", required: true
         input "txtEnable", "bool", title: "Enable description text logging.", defaultValue: true, required: true
-    }
-    section("Settings enable")
-    {
+
         input "manuallyOverrideEnable", "bool", title: "Allow manually override. After turning on lights. No automation active until lights are turned off.", defaultValue: true, required: true
-    }    
-    section("Select devices") {
+    }
+
+    section("Select devices", hideable: true, hidden: false) 
+    {
         lightGroupArray().each { grp ->
             def grpName = grp[0]
             def gprDescription = grp[1].toLowerCase()
@@ -127,42 +212,73 @@ preferences {
         }
         input "motionSensorsTurnOn", "capability.motionSensor", title: "Select motion sensors to turn on light(s)", required: false, multiple: true
         input "motionSensorsKeepOn", "capability.motionSensor", title: "Select motion sensors to keep on light(s), <b>motion: ${states.isMotion}</b>", required: false, multiple: true
+
         input "luxSensor", "capability.illuminanceMeasurement", title: "Select lux sensor, <b>lux measured: ${states.lux}</b>", required: false
+        input "luxThreshold", "number", title: "Lux Threshold for turning on the lights, <b>lux measured: ${states.lux} , islow: ${states.luxlow}</b> ", required: false, defaultValue: 50
         input "isDarkSwitch", "capability.switch", title: "IsDark Switch, is <b>on: ${states.darkon}</b>", required: false
 
         input "roomDoors", "capability.contactSensor", title: "Room doors, is <b>open: ${states.isOpenRoomDoor}</b>", required: false, multiple: true
         input "houseDoors", "capability.contactSensor", title: "House doors, is <b>open: ${states.isOpenHouseDoor}</b>", required: false, multiple: true
+
         input "socketPlug", "capability.powerMeter", title: "Select socket plug, power in watts <b>measured: ${states.socketPlugPower}, is using power: ${states.isSocketPlugUsingPower}</b>", required: false
+        input "powerThreshold", "number", title: "Power threshold for it to be considered on (watts), <b>measured: ${states.socketPlugPower}, is using power: ${states.isSocketPlugUsingPower}</b>", required: false, defaultValue: 55
+
         input "turnOnButtons", "capability.pushableButton", title: "Which buttons turnon?", required: false, multiple: true
     }
-    section("Configs") {
-        input "luxThreshold", "number", title: "Lux Threshold for turning on the lights, <b>lux measured: ${states.lux} , islow: ${states.luxlow}</b> ", required: false, defaultValue: 50
-        input "powerThreshold", "number", title: "Power threshold for it to be considered on (watts), <b>measured: ${states.socketPlugPower}, is using power: ${states.isSocketPlugUsingPower}</b>", required: false, defaultValue: 55
-    }
-    section("Select Mode(s) to Activate Turning On Light") {
-        input "includedModes", "mode", title: "Modes to Include", multiple: true, required: false
-    }
+
     includedModes.each { mode ->
-        lightGroupArray().each { grp ->  // Loop through each row
-            def grpName = grp[0]
-            logdebug "${grpName}"
-            stateGroupArray().each { state ->
-                def stateName = state[0]
-                def nms = getConfig(mode, grpName, stateName)
-                section("${nms.title} <code style='background-color: yellow;' id='${nms.base}'>${nms.base}</code>", hideable: true, hidden: !nms.values.do) {
-                    input "${nms.do}", "bool", title: "${nms.statedescription} DO? Otherwise skip actions <code style='background-color: yellow'>${nms.do}</code>", required: true, defaultValue: false
-                    input "${nms.turnon}", "bool", title: "${nms.statedescription} turn light on? <code style='background-color: yellow'>${nms.turnon}</code>", required: true, defaultValue: false
-    
-                        input "${nms.forcechange}", "bool", title: "${nms.statedescription} force change even if lights on? <code style='background-color: yellow'>${nms.forcechange}</code>", required: true, defaultValue: false
-                        input "${nms.stayon}", "number", title: "${nms.statedescription} stayon in seconds <code style='background-color: yellow'>${nms.stayon}</code>", required: true, defaultValue: 30
-                        input "${nms.brightness}", "number", title: "${nms.statedescription} brightness (0-100)<code style='background-color: yellow'>${nms.brightness}</code>", required: true, defaultValue: 88
-                        input "${nms.color}", "color", title: "${nms.statedescription} color <code style='background-color: yellow'>${nms.color}</code>", required: false, defaultValue: "#ffffff"
-                    
+        section("Mode: ${mode}", hideable: true, hidden: false) 
+        {
+            lightGroupArray().each { grp -> 
+                def grpName = grp[0]
+
+                stateGroupArray().each { state ->
+                    def stateName = state[0]
+                    def nms = getConfig(mode, grpName, stateName)
+                    //input "${nms.do}", "bool", title: "${grpName} - ${nms.statedescription}? <code style='background-color: yellow'>${nms.do}</code><a href='#${nms.base}'> ➜➜➜ </a>", required: true, defaultValue: false
+                    input "${nms.do}", "bool", title: "${grpName} - ${nms.statedescription}? ${nms.values.do ? "<a href='#${nms.base}'> ➜➜➜ </a>" : ""}", required: true, defaultValue: false
                 }
             }
+            input name: "Save", type: "button", title: "Save", submitOnChange: true
         }
+    }    
+
+    includedModes.each { mode ->
+        section("Mode: ${mode}", hideable: true, hidden: true) 
+        {
+            lightGroupArray().each { grp -> 
+                def grpName = grp[0]
+                //logdebug "${grpName}"
+                stateGroupArray().each { state ->
+                    def stateName = state[0]
+                    def nms = getConfig(mode, grpName, stateName)
+
+                    if(nms.values.do)
+                    {
+                        //section("${nms.title}<code style='background-color: yellow;' id='${nms.base}'>${nms.base}</code>", hideable: true, hidden: !nms.values.do) 
+                        //{
+                        paragraph "<code style='background-color: yellow;' id='${nms.base}'>${nms.base}</code>${nms.title}"
+                        //paragraph "${nms.statedescription}"
+                        //input "${nms.do}", "bool", title: "${nms.statedescription} DO? Otherwise skip actions <code style='background-color: yellow'>${nms.do}</code>", required: true, defaultValue: false
+                        input "${nms.turnon}", "bool", title: "turn light on? <code class='ninja' style='background-color: yellow'>${nms.turnon}</code>", required: true, defaultValue: false
+                        input "${nms.forcechange}", "bool", title: "force change even if lights on? <code class='ninja' style='background-color: yellow'>${nms.forcechange}</code>", required: true, defaultValue: false
+                        input "${nms.stayon}", "number", title: "stayon in seconds <code class='ninja' style='background-color: yellow'>${nms.stayon}</code>", required: true, defaultValue: 30
+                        input "${nms.brightness}", "number", title: "brightness (0-100) <code class='ninja' style='background-color: yellow'>${nms.brightness}</code>", required: true, defaultValue: 88
+                        input "${nms.color}", "color", title: "color <code class='ninja' style='background-color: yellow'>${nms.color}</code>", required: false, defaultValue: "#ffffff"                        
+                        input name: "Save", type: "button", title: "Save", submitOnChange: true            
+                        paragraph "<div style='background-color: white; margin-bottom: 20px;'>&nbsp;</div>"
+                        //}                      
+                    }
+
+                }
+            }
+            
+        }
+
     }
 }
+
+
 
 def getMode()
 {
@@ -185,11 +301,11 @@ def lightGroupArray()
 } 
 def stateGroupArray(){
     return [
-        ["no", "motion not dark"],
-        ["dark", "motion dark"],
-        ["roomdoorsopen", "when room door open"],
-        ["housedoorsopen", "when house door open"],
-        ["lightsmanuallyon", "when lights manually on"],
+        //["no", "motion != dark"],
+        ["dark", "🚶 dark"],
+        ["roomdoorsopen", "when room 🚪 open"],
+        ["housedoorsopen", "when house 🚪 open"],
+        //["lightsmanuallyon", "when lights manually on"],
         
         //["buttonpushed", "when button pushed"],
         //["buttondoublepushed", "when button double pushed"],
@@ -197,7 +313,8 @@ def stateGroupArray(){
     ]
 } 
 
-def logdebug(message, methodName ="") {
+def logdebug(message, methodName ="") 
+{
     if (logEnable)
     {
         if(methodName != "")
@@ -208,7 +325,8 @@ def logdebug(message, methodName ="") {
     }
 }
 
-def loginfo(message, methodName ="") {
+def loginfo(message, methodName ="") 
+{
     if(txtEnable)
     {
         if(methodName != "")
@@ -219,12 +337,38 @@ def loginfo(message, methodName ="") {
     }
 }
 
-def installed() {
+def logerror(message, methodName ="") 
+{
+    if(txtEnable)
+    {
+        if(methodName != "")
+        {
+            state.logPostfix = methodName
+        }
+        log.error "[⚙️${state.logPrefix}] ${message} ➜${state.logPostfix}"
+    }
+}
+
+def logwarn(message, methodName ="") 
+{
+    if(txtEnable)
+    {
+        if(methodName != "")
+        {
+            state.logPostfix = methodName
+        }
+        log.warn "[⚙️${state.logPrefix}] ${message} ➜${state.logPostfix}"
+    }
+}
+
+def installed() 
+{
     //logdebug "Installed with settings: ${settings}"
     initialize()
 }
 
-def updated() {
+def updated() 
+{
     //logdebug "Updated with settings: ${settings}"
     unsubscribe()
     initialize()
@@ -255,6 +399,7 @@ def initialize()
     }
     if(sidelights)
     {
+        subscribe(sidelights, "switch", lightSwitchesHandler)
         subscribe(sidelights, "switch.on", lightSwitchedOnHandler)
         subscribe(sidelights, "switch.off", lightSwitchedOffHandler)
     }
@@ -300,12 +445,12 @@ def initialize()
     
     state.turnedonmanually = false
 }
+
 //DEBUG
 void spitOut(states, configs)
 {
     def callMethod = "spitOut"
-    logdebug(lightGroupArray()[0][0])
-    //config = getConfig("Away", "mainlights", "no")
+    logdebug(lightGroupArray()[0][0], callMethod)
     logdebug("config ${configs}", callMethod)
     logdebug("isvalidmode ${configs.isvalidmode}", callMethod)
     logdebug("state ${states}", callMethod)
@@ -322,7 +467,6 @@ void handleSimpleMotion(manual = "") //LOW LIGHT AND MOTION ON OR OFF
     def callMethod = "handleSimpleMotion"
     def currentMode = getMode()
     def states = allStates()
-    logdebug("states ${states}", callMethod)   
     
     if(states.isvalidmode)
     {
@@ -335,7 +479,7 @@ void handleSimpleMotion(manual = "") //LOW LIGHT AND MOTION ON OR OFF
             sidelights?.off()
             if(states.isAnyLightOnMain)
             {
-                logdebug("skip main lights already on", callMethod)
+                loginfo("skip main lights already on", callMethod)
             }            
             else
             {
@@ -351,8 +495,7 @@ void handleSimpleDoor(manual = "") //CONTACT ON OR OFF
     def callMethod = "handleSimpleDoor"
     def currentMode = getMode()
     def states = allStates()
-    logdebug("states ${states}", callMethod)   
-    
+   
     if(states.isvalidmode)
     {
         if(false)
@@ -379,20 +522,22 @@ void handleOffice()
     def callMethod = "handleOffice"
     def currentMode = getMode()
     def states = allStates()
-    logdebug("states ${states}", callMethod)  
+
     if(states.isvalidmode)
     {
         if(false)
         {
         
         }   
+        /*
         else if(states.isAnyLightOnMain)
         {
             def cfg = getConfig(currentMode, "mainlights", "lightsmanuallyon")
             handleLightsBasedOnConfig(states, cfg, mainlights)
             
             runIn(state.stayon, turnOffLights)
-        }    
+        } 
+        */
         else if(!states.isAnyLightOnMain)
         {
             mainlights.off()
@@ -406,7 +551,6 @@ void handleKidsRoom(manual = "") //LEX
     def callMethod = "handleKidsRoom"
     def currentMode = getMode()
     def states = allStates()
-    logdebug("states ${states}", callMethod)   
     
     if(states.isvalidmode)
     {
@@ -597,10 +741,8 @@ void handleLightsBasedOnConfig(states, configs, lights)
 def motionDetectedTurnOnHandler(evt) 
 {
     def callMethod = "motionDetectedTurnOnHandler"
-    state.lastmotiontime = nowTime()//.format('yyyy-MM-dd, HH:mm:ss')               
-    //loginfo("last motion ${  state.lastmotiontime }", callMethod)  
-    
-    loginfo("motion detected on turn op device, unscheduling checkMotionAndTurnOff", callMethod)
+    loginfo("motion detected turn on device, unscheduling checkMotionAndTurnOff", callMethod)
+    state.lastmotiontime = nowTime()
     unschedule(checkMotionAndTurnOff)
     
     if(aboutRoom == "h"){ handleHallway() }
@@ -611,12 +753,6 @@ def motionDetectedTurnOnHandler(evt)
     //else if ( ["w", "s"].contains(aboutRoom) ) { handleSimpleDoor() }
 }
 
-def motionStoppedTurnOnHandler(evt) 
-{
-    def callMethod = "motionStoppedTurnOnHandler"
-}
-
-
 def motionDetectedKeepOnHandler(evt) 
 {
     def callMethod = "motionDetectedKeepOnHandler"
@@ -626,18 +762,27 @@ def motionDetectedKeepOnHandler(evt)
     }
     
     loginfo("motion detected on keep op device, unscheduling checkMotionAndTurnOff", callMethod)
+    state.lastmotiontime = nowTime()
     unschedule(checkMotionAndTurnOff)            
-
-    state.motiondetectedkeeponunscheduletime = nowTime()
-    //.format('yyyy-MM-dd, HH:mm:ss')               
 }
+
+
+def motionStoppedTurnOnHandler(evt) 
+{
+    def callMethod = "motionStoppedTurnOnHandler"
+    motionStoppedReschedule(callMethod)
+}
+
+
+
 
 
 
 def motionStoppedKeepOnHandler(evt) 
 {
     def callMethod = "motionStoppedKeepOnHandler"
-    //def configs = getConfig(getMode(), "mainlights", "dark")
+    motionStoppedReschedule(callMethod)
+    /*
     //TEST IF LIGHTS ARE ON?
     if(isAnySwitchOn(mainlights) || isAnySwitchOn(sidelights))
     {
@@ -646,18 +791,34 @@ def motionStoppedKeepOnHandler(evt)
             if(state.stayon > 0 && state.stayon != null )
             {
                 unschedule(checkMotionAndTurnOff)
-                state.motionstoppedkeeponunscheduletime = nowTime()
-                //.format('yyyy-MM-dd, HH:mm:ss')               
-                
                 runIn(state.stayon, checkMotionAndTurnOff)
-                
-                loginfo("lights off in ${state.stayon}s", callMethod)
-                
-                state.motionlesstime = nowTime()//.format('yyyy-MM-dd, HH:mm:ss');               
-                loginfo("motionless ${  state.motionlesstime }", callMethod)
-                def newTime = new Date(new Date().time + (state.stayon * 1000)) 
-                state.turnofftime = newTime//.format('yyyy-MM-dd, HH:mm:ss')
-                loginfo("lights will go off at ${  state.turnofftime }", callMethod)
+                state.motionlesstime = nowTime()
+                state.turnofftime = addSecondsToNow(state.stayon)
+                loginfo("lights will go off in ${state.stayon}s at ${  state.turnofftime }", callMethod)
+            }    
+            else
+            {
+                //loginfo("state.stayon == ${state.stayon}", "motionStoppedKeepOnHandler")
+            }
+        }
+    }
+    */
+}
+
+def motionStoppedReschedule(callMethod)
+{
+    //TEST IF LIGHTS ARE ON?
+    state.motionlesstime = nowTime()
+    if(isAnySwitchOn(mainlights) || isAnySwitchOn(sidelights))
+    {
+        if ( ["h","lr","mb","k", "g", "o"].contains(aboutRoom) ) //ROOMS WITH MOTION SENSORS
+        {
+            if(state.stayon > 0 && state.stayon != null )
+            {
+                unschedule(checkMotionAndTurnOff)
+                runIn(state.stayon, checkMotionAndTurnOff)
+                state.turnofftime = addSecondsToNow(state.stayon)
+                loginfo("lights will go off in ${state.stayon}s at ${  state.turnofftime }", callMethod)
             }    
             else
             {
@@ -666,6 +827,8 @@ def motionStoppedKeepOnHandler(evt)
         }
     }
 }
+
+
 
 def powerChangedHandler(evt)
 {
@@ -711,6 +874,13 @@ def luxChangedHandler(evt)
 def switchesHandler(evt)
 {
     def callMethod = "switchesHandler"
+    def device = evt.device // The device that triggered the event
+    def deviceName = device.displayName // Get the name of the light
+    def deviceStatus = evt.value // Get the value (should be "off" in this case)
+    
+    loginfo("The switch ${deviceName} was turned ${deviceStatus}.", callMethod)    
+    
+       
     /*
     def anylightson = isAnySwitchOn(mainlights)
     logdebug ("switch change ${evt?.displayName} (virt: ${isVirtual(evt?.device)}) changed to ${evt.value}, any lights on: ${anylightson}", "switchesHandler")
@@ -730,7 +900,10 @@ def switchesHandler(evt)
 def lightSwitchedOnHandler(evt)
 {
     def callMethod = "lightSwitchedOnHandler"
-    loginfo("manuallyOverrideEnable: ${manuallyOverrideEnable}", callMethod)
+    def device = evt.device
+    def deviceName = device.displayName
+    def deviceStatus = evt.value
+    
     if(manuallyOverrideEnable)
     {
         def nowTime = now()
@@ -739,11 +912,13 @@ def lightSwitchedOnHandler(evt)
 
         if (elapsedTime > 3000) // 3 seconds threshold for "manual" assumption
         { 
-            loginfo("Light was turned on manually.", callMethod)
+            loginfo("Manually was turned on ${deviceName}.", callMethod)
             state.turnedonmanually = true
-            // Add your manual action handling here
-        } else {
-            loginfo("Light was turned on automatically.", callMethod)
+            state.skippedTurningOff = 0
+        } 
+        else 
+        {
+            loginfo("Automatically turned on ${deviceName}", callMethod)
         }      
     }
 }
@@ -751,9 +926,17 @@ def lightSwitchedOnHandler(evt)
 def lightSwitchedOffHandler(evt)
 {
     def callMethod = "lightSwitchedOffHandler"
+    def device = evt.device
+    def deviceName = device.displayName
+    def deviceStatus = evt.value
+
     if(state.turnedonmanually)
     {
-        loginfo("Light turned off manually. Resetting automation flag.", callMethod)
+        loginfo("Manually turned off ${deviceName}. Resetting automation flag.", callMethod)
+    }
+    else
+    {
+        loginfo("Automatically turned off ${deviceName}", callMethod)
     }
     state.turnedonmanually = false
 }
@@ -761,7 +944,6 @@ def lightSwitchedOffHandler(evt)
 
 def lightSwitchesHandler(evt)
 {
-    def callMethod = "lightSwitchesHandler"
     if(aboutRoom == "o")
     {
         handleOffice()
@@ -773,6 +955,7 @@ def modeChangedHandler(evt) {
     def callMethod = "modeChangedHandler"
     //logdebug("mode to <b>${evt.displayName}</b>", "modeChangedHandler")
     def currentMode = getMode()
+    state.modechangedtime = nowTime()
     logdebug("mode to <b>${currentMode}</b>", callMethod)
     
     def states = allStates()
@@ -833,9 +1016,8 @@ void turnOnLights(states, configs, lights, comment = "")
 {
     def callMethod = "turnOnLights"
     state.lastautomation = now()
-    state.lastautomationtime = nowTime()//.format('yyyy-MM-dd, HH:mm:ss')
+    state.lastautomationtime = nowTime()
     state.lasttrigger = configs.base
-    state.lasttriggertime = nowTime()//.format('yyyy-MM-dd, HH:mm:ss')
     state.lastmeasuredlux = states.lux
     state.stayon = configs.values.stayon
     state.forced = configs.values.forcechange
@@ -871,6 +1053,7 @@ def turnOffLights()
     def callMethod = "turnOffLights"
     if(state.turnedonmanually)
     {
+        state.skippedTurningOff = state.skippedTurningOff + 1
         loginfo("Automation attempted to turn off the light, but it was left on due to manual override.", callMethod)
     }
     else
@@ -886,6 +1069,7 @@ def turnOffGrpLights(lights)
     def callMethod = "turnOffGrpLights"
     if(state.turnedonmanually)
     {
+        state.skippedTurningOff = state.skippedTurningOff + 1
         loginfo("Automation attempted to turn off the light, but it was left on due to manual override.",callMethod)
     }
     else    
@@ -1055,9 +1239,10 @@ def getConfig(modename, lightname, statename)
             def s = stateGroupArray().find { it[0] == statename }[1]
             //logdebug l
             //logdebug s
-            def stateDescription = "${statename}: ${s}"
+            //def stateDescription = "${statename}: ${s}"
+            def stateDescription = "${s}"
             def base = "${modename}_${lightname}_${statename}"
-            def titleGrpState = "[${modename.toUpperCase()}-💡${l.toLowerCase()}] ${s.toLowerCase()}"
+            def titleGrpState = "<table class='noborder'><tr><td>🧩</td><td>${modename.toUpperCase()}</td></tr><tr><td>💡</td><td>${l.toLowerCase()}</td></tr><tr><td>⚙️</td><td>${s.toLowerCase()}</td></tr></table>"
             result = [
                 statedescription: stateDescription,
                 title: titleGrpState,
@@ -1134,12 +1319,23 @@ def humanizeDatetime(inputTime)
             def months = days / 30
             def years = days / 365
 
-            if (seconds < 60) return "${Math.round(seconds)} seconds ago"
-            if (minutes < 60) return "${Math.round(minutes)} minutes ago"
-            if (hours < 24) return "${Math.round(hours)} hours ago"
-            if (days < 30) return "${Math.round(days)} days ago"
-            if (months < 12) return "${Math.round(months)} months ago"
-            return "${Math.round(years)} years ago"        
+
+            if(diff < 0)
+            {
+                //return "${diff}"            
+                def postfix = "to go"
+                if (seconds < 60) return "${-Math.round(seconds)} seconds " + postfix
+            }
+            else
+            {
+                def postfix = "ago"
+                if (seconds < 60) return "${Math.round(seconds)} sec " + postfix
+                if (minutes < 60) return "${Math.round(minutes)} min " + postfix
+                if (hours < 24) return "${Math.round(hours)} hrs " + postfix
+                if (days < 30) return "${Math.round(days)} days " + postfix
+                if (months < 12) return "${Math.round(months)} months " + postfix
+                return "${Math.round(years)} years " + postfix
+            }
         } catch (Exception e) {
             log.error "General Exception caught: ${e.message}"
             return "Err"
@@ -1166,34 +1362,43 @@ def isDate(input) {
     return input instanceof Date
 }
 
-def nowTime()
-{
-    return new Date().format("yyyy-MM-dd'T'HH:mm:ss")
+def addSecondsToNow(seconds, format = "yyyy-MM-dd'T'HH:mm:ss.SSS") {
+    def now = new Date()
+    def newTime = new Date(now.time + (seconds * 1000))
+    return newTime.format(format)
 }
 
-def retrieveDate(key) {
+def nowTime(format = "yyyy-MM-dd'T'HH:mm:ss.SSS")
+{
+    return new Date().format(format)
+}
+
+def retrieveDate(key, format = "yyyy-MM-dd'T'HH:mm:ss.SSS") 
+{
+    def callMethod = "retrieveDate"
     if (state[key]) {
         try {
-            def parsedDate = Date.parse("yyyy-MM-dd'T'HH:mm:ss", state[key])
+            def parsedDate = Date.parse(format, state[key])
             //log.debug "Parsed Date from state[$key]: ${parsedDate}"
             return parsedDate
         } catch (Exception e) {
-            log.error "Failed to parse stored date from state[$key]: ${state[key]}. Error: ${e.message}"
+            logerror("Failed to parse stored date from state[$key]: ${state[key]}. Error: ${e.message}", callMethod)
             return null
         }
     } else {
-        log.warn "No date stored in state[$key]."
+        logwarn("No date stored in state[$key].", callMethod)
         return null
     }
 }
 
 
-def getFormatted(key)
+def getFormatted(key, format = "HH:mm:ss.SSS")
 {
         def result = retrieveDate(key)
         if(result)
         {
-            return "${result.format("yyyy-MM-dd - HH:mm:ss")} (${humanizeDatetime(result)})" 
+            //return "${result.format("yyyy-MM-dd - HH:mm:ss.SSS")} (${humanizeDatetime(result)})" 
+            return "${result.format(format)} (${humanizeDatetime(result)})" 
         }
 }
 
@@ -1206,12 +1411,3 @@ def getHumanize(key)
         }
 }
 
-
-def isParsableDate(value) {
-    try {
-        Date.parse("yyyy-MM-dd", value) // Adjust format as needed
-        return true
-    } catch (Exception e) {
-        return false
-    }
-}
