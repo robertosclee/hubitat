@@ -52,6 +52,19 @@ margin: 0px;
 {
 display:none;
 }
+
+.mdl-cell 
+{
+margin: 5px !important;
+}
+
+.mdl-button
+{
+-webkit-box-shadow: none !important;
+-moz-box-shadow: none !important;
+box-shadow: none !important;
+}
+
 </style>"""
 
         def generalinfo = "<table>"
@@ -224,6 +237,8 @@ display:none;
         input "powerThreshold", "number", title: "Power threshold for it to be considered on (watts), <b>measured: ${states.socketPlugPower}, is using power: ${states.isSocketPlugUsingPower}</b>", required: false, defaultValue: 55
 
         input "turnOnButtons", "capability.pushableButton", title: "Which buttons turnon?", required: false, multiple: true
+        
+        input name: "Save", type: "button", title: "Save", submitOnChange: true
     }
 
     includedModes.each { mode ->
@@ -231,18 +246,72 @@ display:none;
         {
             lightGroupArray().each { grp -> 
                 def grpName = grp[0]
+                def devicesRelatedToGrp = grp[2]
+                
+                if(devicesRelatedToGrp)
+                {
+                    stateGroupArray().each { state ->
+                        def stateName = state[0]
+                        def devicesRelatedToState = state[2]
+                        def nms = getConfig(mode, grpName, stateName)
+                        //input "${nms.do}", "bool", title: "${grpName} - ${nms.statedescription}? <code style='background-color: yellow'>${nms.do}</code><a href='#${nms.base}'> ➜➜➜ </a>", required: true, defaultValue: false
+                        //input "${nms.do}", "bool", title: "${grpName} - ${nms.statedescription}? ${nms.values.do ? "<a href='#${nms.base}'> ➜➜➜ </a>" : ""}", required: true, defaultValue: false
+                        if(devicesRelatedToState)
+                        {
+                            //input "${nms.do}", "bool", title: "${grpName} - ${devicesRelatedToGrp} - ${nms.statedescription} ", required: false, defaultValue: false
+                            input "${nms.do}", "bool", title: "${devicesRelatedToGrp} ➜ ${boolToOnOff(nms.values.turnon)} - ${nms.statedescription} ", required: false, defaultValue: false
+                        }
 
-                stateGroupArray().each { state ->
-                    def stateName = state[0]
-                    def nms = getConfig(mode, grpName, stateName)
-                    //input "${nms.do}", "bool", title: "${grpName} - ${nms.statedescription}? <code style='background-color: yellow'>${nms.do}</code><a href='#${nms.base}'> ➜➜➜ </a>", required: true, defaultValue: false
-                    input "${nms.do}", "bool", title: "${grpName} - ${nms.statedescription}? ${nms.values.do ? "<a href='#${nms.base}'> ➜➜➜ </a>" : ""}", required: true, defaultValue: false
+                    }                
                 }
+
             }
             input name: "Save", type: "button", title: "Save", submitOnChange: true
         }
-    }    
+        
+        
+        
+        section("Mode: ${mode} - configurations", hideable: true, hidden: true) 
+        {
+            lightGroupArray().each { grp -> 
+                def grpName = grp[0]
+                def devicesRelatedToGrp = grp[2]
+                //logdebug "${grpName}"
+                stateGroupArray().each { state ->
+                    def stateName = state[0]
+                    def devicesRelatedToState = state[2]
+                    def nms = getConfig(mode, grpName, stateName)
 
+                    if(nms.values.do)
+                    {
+                        //section("${nms.title}<code style='background-color: yellow;' id='${nms.base}'>${nms.base}</code>", hideable: true, hidden: !nms.values.do) 
+                        //{
+                        //paragraph "<code style='background-color: yellow;' id='${nms.base}'>${nms.base}</code>${nms.title}"
+                        paragraph "${devicesRelatedToGrp} ${nms.title} (${devicesRelatedToState})"
+                        //paragraph "${nms.statedescription}"
+                        //input "${nms.do}", "bool", title: "${nms.statedescription} DO? Otherwise skip actions <code style='background-color: yellow'>${nms.do}</code>", required: true, defaultValue: false
+                        input "${nms.turnon}", "bool", title: "turn light on? <code class='ninja' style='background-color: yellow'>${nms.turnon}</code>", required: true, defaultValue: false
+                        if(nms.values.turnon)
+                        {
+                            input "${nms.forcechange}", "bool", title: "force change even if lights on? <code class='ninja' style='background-color: yellow'>${nms.forcechange}</code>", required: true, defaultValue: false
+                            input "${nms.stayon}", "number", title: "stayon in seconds <code class='ninja' style='background-color: yellow'>${nms.stayon}</code>", required: true, defaultValue: 30
+                            input "${nms.brightness}", "number", title: "brightness (0-100) <code class='ninja' style='background-color: yellow'>${nms.brightness}</code>", required: true, defaultValue: 88
+                            input "${nms.color}", "color", title: "color <code class='ninja' style='background-color: yellow'>${nms.color}</code>", required: false, defaultValue: "#ffffff"                                                
+                        }
+
+                        input name: "Save", type: "button", title: "Save", submitOnChange: true            
+                        paragraph "<div style='background-color: white; margin-bottom: 50px;'>&nbsp;</div>"
+                        //}                      
+                    }
+
+                }
+            }
+            
+        }
+        
+    } 
+    
+    /*
     includedModes.each { mode ->
         section("Mode: ${mode}", hideable: true, hidden: true) 
         {
@@ -276,6 +345,7 @@ display:none;
         }
 
     }
+    */
 }
 
 
@@ -295,16 +365,17 @@ def getMode()
 def lightGroupArray()
 {
     return [
-        ["mainlights", "Main lights"],
-        ["sidelights", "Side lights"],
+        ["mainlights", "Main lights", mainlights],
+        ["sidelights", "Side lights", sidelights],
     ]
 } 
 def stateGroupArray(){
     return [
         //["no", "motion != dark"],
-        ["dark", "🚶 dark"],
-        ["roomdoorsopen", "when room 🚪 open"],
-        ["housedoorsopen", "when house 🚪 open"],
+        //["dark", "🚶 dark", isDarkSwitch],
+        ["dark", "when dark 🚶", isDarkSwitch],
+        ["roomdoorsopen", "when open room🚪 ", roomDoors],
+        ["housedoorsopen", "when open house🚪", houseDoors],
         //["lightsmanuallyon", "when lights manually on"],
         
         //["buttonpushed", "when button pushed"],
@@ -363,13 +434,15 @@ def logwarn(message, methodName ="")
 
 def installed() 
 {
-    //logdebug "Installed with settings: ${settings}"
+    def callMethod = "installed"
+    logdebug("Installed with settings: ${settings}", callMethod)
     initialize()
 }
 
 def updated() 
 {
-    //logdebug "Updated with settings: ${settings}"
+    def callMethod = "updated"
+    logdebug("Updated with settings: ${settings}", callMethod)
     unsubscribe()
     initialize()
 }
@@ -441,12 +514,21 @@ def initialize()
     }
     logdebug ("subscriptions complete.", callMethod)
 
-    unschedule(turnOffIfInactive)
+    //unschedule()
     
     state.turnedonmanually = false
 }
 
 //DEBUG
+void appButtonHandler(String buttonName) {
+    def callMethod = "appButtonHandler"
+    logdebug( "Button pressed: $buttonName", callMethod)
+    if (buttonName == "Save") {
+        loginfo( "Saved button logic executed", callMethod)
+        // Add your save logic here
+    }
+}
+
 void spitOut(states, configs)
 {
     def callMethod = "spitOut"
@@ -512,7 +594,7 @@ void handleSimpleDoor(manual = "") //CONTACT ON OR OFF
         else if(!states.isOpenRoomDoor)
         {
             mainlights.off()
-            unschedule(turnOffLights)
+            unschedule()
         }         
     }
 }
@@ -541,7 +623,7 @@ void handleOffice()
         else if(!states.isAnyLightOnMain)
         {
             mainlights.off()
-            unschedule(turnOffLights)
+            unschedule()
         }         
     }    
 }
@@ -741,9 +823,9 @@ void handleLightsBasedOnConfig(states, configs, lights)
 def motionDetectedTurnOnHandler(evt) 
 {
     def callMethod = "motionDetectedTurnOnHandler"
-    loginfo("motion detected turn on device, unscheduling checkMotionAndTurnOff", callMethod)
+    loginfo("motion turn on, unscheduling", callMethod)
     state.lastmotiontime = nowTime()
-    unschedule(checkMotionAndTurnOff)
+    unschedule()
     
     if(aboutRoom == "h"){ handleHallway() }
     else if(aboutRoom == "mb"){ handleMasterBedroom() }
@@ -761,9 +843,9 @@ def motionDetectedKeepOnHandler(evt)
 
     }
     
-    loginfo("motion detected on keep op device, unscheduling checkMotionAndTurnOff", callMethod)
+    loginfo("motion keep on, unscheduling", callMethod)
     state.lastmotiontime = nowTime()
-    unschedule(checkMotionAndTurnOff)            
+    unschedule()            
 }
 
 
@@ -782,27 +864,6 @@ def motionStoppedKeepOnHandler(evt)
 {
     def callMethod = "motionStoppedKeepOnHandler"
     motionStoppedReschedule(callMethod)
-    /*
-    //TEST IF LIGHTS ARE ON?
-    if(isAnySwitchOn(mainlights) || isAnySwitchOn(sidelights))
-    {
-        if ( ["h","lr","mb","k", "g", "o"].contains(aboutRoom) ) //ROOMS WITH MOTION SENSORS
-        {
-            if(state.stayon > 0 && state.stayon != null )
-            {
-                unschedule(checkMotionAndTurnOff)
-                runIn(state.stayon, checkMotionAndTurnOff)
-                state.motionlesstime = nowTime()
-                state.turnofftime = addSecondsToNow(state.stayon)
-                loginfo("lights will go off in ${state.stayon}s at ${  state.turnofftime }", callMethod)
-            }    
-            else
-            {
-                //loginfo("state.stayon == ${state.stayon}", "motionStoppedKeepOnHandler")
-            }
-        }
-    }
-    */
 }
 
 def motionStoppedReschedule(callMethod)
@@ -815,7 +876,7 @@ def motionStoppedReschedule(callMethod)
         {
             if(state.stayon > 0 && state.stayon != null )
             {
-                unschedule(checkMotionAndTurnOff)
+                unschedule()
                 runIn(state.stayon, checkMotionAndTurnOff)
                 state.turnofftime = addSecondsToNow(state.stayon)
                 loginfo("lights will go off in ${state.stayon}s at ${  state.turnofftime }", callMethod)
@@ -953,7 +1014,6 @@ def lightSwitchesHandler(evt)
 
 def modeChangedHandler(evt) {
     def callMethod = "modeChangedHandler"
-    //logdebug("mode to <b>${evt.displayName}</b>", "modeChangedHandler")
     def currentMode = getMode()
     state.modechangedtime = nowTime()
     logdebug("mode to <b>${currentMode}</b>", callMethod)
@@ -1087,11 +1147,11 @@ def checkMotionAndTurnOff()
     {
         loginfo ("No motion, turning off",callMethod)    
         turnOffLights()
-        unschedule(checkMotionAndTurnOff)
+        unschedule()
     } 
     else 
     {
-        unschedule(checkMotionAndTurnOff)
+        unschedule()
         loginfo ("Motion, rescheduling turning off",callMethod)    
         runIn(state.stayon, checkMotionAndTurnOff) // Check again after 1 minute if motion persists
     }
@@ -1242,7 +1302,8 @@ def getConfig(modename, lightname, statename)
             //def stateDescription = "${statename}: ${s}"
             def stateDescription = "${s}"
             def base = "${modename}_${lightname}_${statename}"
-            def titleGrpState = "<table class='noborder'><tr><td>🧩</td><td>${modename.toUpperCase()}</td></tr><tr><td>💡</td><td>${l.toLowerCase()}</td></tr><tr><td>⚙️</td><td>${s.toLowerCase()}</td></tr></table>"
+            //def titleGrpState = "<table class='noborder'><tr><td>🧩</td><td>${modename.toUpperCase()}</td></tr><tr><td>💡</td><td>${l.toLowerCase()}</td></tr><tr><td>⚙️</td><td>${s.toLowerCase()}</td></tr></table>"
+            def titleGrpState = "⚙️${s.toLowerCase()}"
             result = [
                 statedescription: stateDescription,
                 title: titleGrpState,
@@ -1411,3 +1472,6 @@ def getHumanize(key)
         }
 }
 
+String boolToOnOff(boolean value) {
+    return value ? "on" : "off"
+}
