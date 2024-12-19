@@ -259,7 +259,7 @@ box-shadow: none !important;
                         if(devicesRelatedToState)
                         {
                             //input "${nms.do}", "bool", title: "${grpName} - ${devicesRelatedToGrp} - ${nms.statedescription} ", required: false, defaultValue: false
-                            input "${nms.do}", "bool", title: "${devicesRelatedToGrp} ➜ ${boolToOnOff(nms.values.turnon)} - ${nms.statedescription} ", required: false, defaultValue: false
+                            input "${nms.do}", "bool", title: "${devicesRelatedToGrp}  ${nms.values.do ? "➜ " + boolToOnOff(nms.values.turnon) : ""} - ${nms.statedescription} ", required: false, defaultValue: false
                         }
 
                     }                
