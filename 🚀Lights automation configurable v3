@@ -60,11 +60,23 @@ margin: 5px !important;
 }
 
 .mdl-button,
-.mdl-button--raised
+.mdl-button--raised,
+.mdl-shadow--2dp
 {
 -webkit-box-shadow: none !important;
 -moz-box-shadow: none !important;
 box-shadow: none !important;
+border: 1px solid #e1e1e1;
+}
+
+.mdl-textfield__input
+{
+border-bottom: 1px solid rgb(221 207 207 / 32%);
+}
+
+.btn-group-lg>.btn, .btn-lg
+{
+padding: 5px 8px;
 }
 
 </style>"""
@@ -74,7 +86,7 @@ box-shadow: none !important;
         generalinfo += "<tr><td colspan='3'>Last triggered: <a href='#${state.lasttrigger}'><b>${state.lasttrigger}</b></a>, ${getFormatted("lastautomationtime")}</td></tr>\n"
         if(manuallyOverrideEnable)
         {
-            generalinfo += "<tr><td>Was turned on manually: ${state.turnedonmanually}</td><td>${getFormatted("turnedonmanuallytime")}<br/>${getFormatted("turnedoffmanuallytime")} </td><td>Skipped turning off: ${state.skippedTurningOff}</td></tr>\n"
+            generalinfo += "<tr><td>Was turned on manually: ${state.turnedonmanually}</td><td>on: ${getFormatted("turnedonmanuallytime")}<br/>off: ${getFormatted("turnedoffmanuallytime")} </td><td>Skipped turning off: ${state.skippedTurningOff}</td></tr>\n"
         }
         else
         {
