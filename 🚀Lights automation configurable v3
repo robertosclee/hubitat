@@ -74,7 +74,7 @@ box-shadow: none !important;
         generalinfo += "<tr><td colspan='3'>Last triggered: <a href='#${state.lasttrigger}'><b>${state.lasttrigger}</b></a>, ${getFormatted("lastautomationtime")}</td></tr>\n"
         if(manuallyOverrideEnable)
         {
-            generalinfo += "<tr><td>Was turned on manually: ${state.turnedonmanually}</td><td>${getFormatted("turnedonmanuallytime")}</td><td>Skipped turning off: ${state.skippedTurningOff}</td></tr>\n"
+            generalinfo += "<tr><td>Was turned on manually: ${state.turnedonmanually}</td><td>${getFormatted("turnedonmanuallytime")}<br/>${getFormatted("turnedoffmanuallytime")} </td><td>Skipped turning off: ${state.skippedTurningOff}</td></tr>\n"
         }
         else
         {
@@ -1001,6 +1001,7 @@ def lightSwitchedOffHandler(evt)
     if(state.turnedonmanually)
     {
         loginfo("Manually turned off ${deviceName}. Resetting automation flag.", callMethod)
+        state.turnedoffmanuallytime = nowTime()
     }
     else
     {
