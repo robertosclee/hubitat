@@ -31,6 +31,7 @@ th, td
 border: 1px solid black;
 padding: 4px 2px 2px 2px;
 text-align: left;
+font-size:88%;
 }
 
 th 
@@ -58,7 +59,8 @@ display:none;
 margin: 5px !important;
 }
 
-.mdl-button
+.mdl-button,
+.mdl-button--raised
 {
 -webkit-box-shadow: none !important;
 -moz-box-shadow: none !important;
@@ -68,11 +70,11 @@ box-shadow: none !important;
 </style>"""
 
         def generalinfo = "<table>"
-        generalinfo += "<tr><td colspan='3'>Mode is now <b>${states.mode}</b> ${states.mode != location.mode ? " (TEST), real mode: <b>${location.mode}</b>" : ""}, since ${getFormatted("modechangedtime")}</td></tr>"
-        generalinfo += "<tr><td colspan='3'>Last automated triggered: <a href='#${state.lasttrigger}'><b>${state.lasttrigger}</b></a> ${getFormatted("lastautomationtime")}</td></tr>\n"
+        generalinfo += "<tr><td colspan='3'>Mode now <b>${states.mode}</b> ${states.mode != location.mode ? " (TEST), real mode: <b>${location.mode}</b>" : ""}, since ${getFormatted("modechangedtime")}</td></tr>"
+        generalinfo += "<tr><td colspan='3'>Last triggered: <a href='#${state.lasttrigger}'><b>${state.lasttrigger}</b></a>, ${getFormatted("lastautomationtime")}</td></tr>\n"
         if(manuallyOverrideEnable)
         {
-            generalinfo += "<tr><td colspan='2'>Was turned on manually: ${state.turnedonmanually}</td><td>Skipped turning off: ${state.skippedTurningOff}</td></tr>\n"
+            generalinfo += "<tr><td>Was turned on manually: ${state.turnedonmanually}</td><td>${getFormatted("turnedonmanuallytime")}</td><td>Skipped turning off: ${state.skippedTurningOff}</td></tr>\n"
         }
         else
         {
@@ -100,11 +102,11 @@ box-shadow: none !important;
             motions += "<th>last change</th>"
             motions += "<th>state</th>"
             motions += "<th>temp</th>"
-            motions += "<th>illuminance</th>"
+            motions += "<th>lux</th>"
             motions += "<th>bat</th>"
-            motions += "<th>humanMotionState</th>"
-            motions += "<th>Status</th>"
-            motions += "<th>powerSource</th>"
+            motions += "<th>human</th>"
+            motions += "<th>stat</th>"
+            motions += "<th>power</th>"
             motions += "</tr>"               
             motionSensorsKeepOn.each { sensor ->
                 //motions += "Motion started ${sensor}: <b>${sensor.latestState("motion")?.date.format('yyyy-MM-dd, HH:mm:ss')}</b>\n"
@@ -161,13 +163,13 @@ box-shadow: none !important;
         lightsstate += "<tr>"
         lightsstate += "<th></th>"
         lightsstate += "<th>last on</th>"
-        lightsstate += "<th>switch</th>"
-        lightsstate += "<th>level</th>"
-        lightsstate += "<th>colorTemperature</th>"
-        lightsstate += "<th>colorMode</th>"
-        lightsstate += "<th>colorName</th>"
+        lightsstate += "<th>state</th>"
+        lightsstate += "<th>lvl</th>"
+        lightsstate += "<th>cTemp</th>"
+        lightsstate += "<th>cMode</th>"
+        lightsstate += "<th>cName</th>"
         lightsstate += "<th>color</th>"
-        lightsstate += "<th>saturation</th>"
+        lightsstate += "<th>sat</th>"
         lightsstate += "<th>hue</th>"
         lightsstate += "</tr>"        
         allLights.each { light ->
@@ -259,7 +261,7 @@ box-shadow: none !important;
                         if(devicesRelatedToState)
                         {
                             //input "${nms.do}", "bool", title: "${grpName} - ${devicesRelatedToGrp} - ${nms.statedescription} ", required: false, defaultValue: false
-                            input "${nms.do}", "bool", title: "${devicesRelatedToGrp}  ${nms.values.do ? "➜ " + boolToOnOff(nms.values.turnon) : ""} - ${nms.statedescription} ", required: false, defaultValue: false
+                            input "${nms.do}", "bool", title: "${devicesRelatedToGrp}  ${nms.values.do ? "➜ " + boolToOnOff(nms.values.turnon) : ""} ${nms.values.forcechange ? nms.values.brightness + "%" : ""} - ${nms.statedescription} ", required: false, defaultValue: false
                         }
 
                     }                
@@ -293,10 +295,14 @@ box-shadow: none !important;
                         input "${nms.turnon}", "bool", title: "turn light on? <code class='ninja' style='background-color: yellow'>${nms.turnon}</code>", required: true, defaultValue: false
                         if(nms.values.turnon)
                         {
-                            input "${nms.forcechange}", "bool", title: "force change even if lights on? <code class='ninja' style='background-color: yellow'>${nms.forcechange}</code>", required: true, defaultValue: false
                             input "${nms.stayon}", "number", title: "stayon in seconds <code class='ninja' style='background-color: yellow'>${nms.stayon}</code>", required: true, defaultValue: 30
-                            input "${nms.brightness}", "number", title: "brightness (0-100) <code class='ninja' style='background-color: yellow'>${nms.brightness}</code>", required: true, defaultValue: 88
-                            input "${nms.color}", "color", title: "color <code class='ninja' style='background-color: yellow'>${nms.color}</code>", required: false, defaultValue: "#ffffff"                                                
+                                
+                            input "${nms.forcechange}", "bool", title: "force change even if lights on? <code class='ninja' style='background-color: yellow'>${nms.forcechange}</code>", required: true, defaultValue: false
+                            if(nms.values.forcechange)
+                            {
+                                input "${nms.brightness}", "number", title: "brightness (0-100) <code class='ninja' style='background-color: yellow'>${nms.brightness}</code>", required: true, defaultValue: 88
+                                input "${nms.color}", "color", title: "color <code class='ninja' style='background-color: yellow'>${nms.color}</code>", required: false, defaultValue: "#ffffff"                               
+                            }
                         }
 
                         input name: "Save", type: "button", title: "Save", submitOnChange: true            
@@ -442,7 +448,7 @@ def installed()
 def updated() 
 {
     def callMethod = "updated"
-    logdebug("Updated with settings: ${settings}", callMethod)
+    //logdebug("Updated with settings: ${settings}", callMethod)
     unsubscribe()
     initialize()
 }
@@ -975,6 +981,7 @@ def lightSwitchedOnHandler(evt)
         { 
             loginfo("Manually was turned on ${deviceName}.", callMethod)
             state.turnedonmanually = true
+            state.turnedonmanuallytime = nowTime()
             state.skippedTurningOff = 0
         } 
         else 
@@ -1114,13 +1121,13 @@ def turnOffLights()
     if(state.turnedonmanually)
     {
         state.skippedTurningOff = state.skippedTurningOff + 1
-        loginfo("Automation attempted to turn off the light, but it was left on due to manual override.", callMethod)
+        loginfo("Skip turn off, manually on.", callMethod)
     }
     else
     {
         mainlights?.off()
         sidelights?.off()
-        loginfo ("Turning off all room lights automatically",callMethod)    
+        loginfo ("Turning off all room lights.",callMethod)    
     }
 }
 
@@ -1130,12 +1137,12 @@ def turnOffGrpLights(lights)
     if(state.turnedonmanually)
     {
         state.skippedTurningOff = state.skippedTurningOff + 1
-        loginfo("Automation attempted to turn off the light, but it was left on due to manual override.",callMethod)
+        loginfo("Skip turn off, manually on.",callMethod)
     }
     else    
     {
         lights?.off()
-        loginfo ("Turning off room lights automatically",callMethod)    
+        loginfo ("Turning off room lights.",callMethod)    
     }
 }
 
@@ -1385,7 +1392,7 @@ def humanizeDatetime(inputTime)
             {
                 //return "${diff}"            
                 def postfix = "to go"
-                if (seconds < 60) return "${-Math.round(seconds)} seconds " + postfix
+                if (seconds < 60) return "${-Math.round(seconds)} sec " + postfix
             }
             else
             {
