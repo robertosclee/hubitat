@@ -336,13 +336,32 @@ def initialize()
     }
     linfo("ENABLED...")
 
+    subscribe(location, "mode", modeChangedHandler)
+    subscribe(isDarkSwitch, "switch", darkSwitchHandler)
+    if(luxSensor)
+    {
+        subscribe(luxSensor, "illuminance", luxChangedHandler)
+    }    
+    if(roomDoors)
+    {
+        subscribe(roomDoors, "contact", roomDoorsHandler)
+    }
+    if(houseDoors)
+    {
+        subscribe(houseDoors, "contact", houseDoorsHandler)
+    }
+    if(turnOnButtons)
+    {
+        subscribe(turnOnButtons, "pushed", buttonTurnOnPushedHandler)
+        subscribe(turnOnButtons, "doubleTapped", buttonTurnOnDoubleTappedHandler)
+        subscribe(turnOnButtons, "held", buttonTurnOnHeldHandler)
+    }
+
     lightGroupArray().each { grp -> 
         if(grp.devices)
         {
             ldebug("subscribing ${grp.devices}")
             subscribe(grp.devices, "switch", lightSwitchesHandler)
-            //subscribe(grp[2], "switch.on", lightSwitchedOnHandler)
-            //subscribe(grp[2], "switch.off", lightSwitchedOffHandler)            
         }
     }
 
@@ -362,7 +381,7 @@ def initialize()
             subscribe(sensor, "motion.inactive", motionStoppedKeepOnHandler)
         }
     }
-    
+    ldebug ("events subscriptions added")
 }
 
 //EVENTS SUBSCRIPTIONS START
@@ -373,28 +392,34 @@ def lightSwitchesHandler(evt)
     def deviceName = device.displayName
     def deviceStatus = evt.value
     linfo("${deviceName} to <b>${deviceStatus}</b>")
+
+    //DETERMINE IF LIGHTS ARE TURNED ON MANUALLY
     if(deviceStatus == "on" && enableManual)
     {
-    //TODO
+        def thresholdDetermineIfAutomation = 1000
+        def elapsedTime = calculateSecondsBetweenDates(parseToDate(state.lastautomation), new Date())
+        ldebug("lastautomation: ${state.lastautomation} - now: ${nowDt()} elapsedTime: ${elapsedTime/(60*60)}, probably${  elapsedTime > thresholdDetermineIfAutomation ? " no " : " "  }automation")
+
+        if(elapsedTime > thresholdDetermineIfAutomation)
+        {
+            ldebug("elapsedTime (${elapsedTime}) > ${thresholdDetermineIfAutomation}, ${deviceName} was turned on manually")
+            state.turnedonmanually = true
+            state.skippedTurningOff = 0
+        }
     }
+    else
+    {
+        ldebug("device ${deviceName} to ${deviceStatus}, automation is active")
+        state.turnedonmanually = false
+        state.skippedTurningOff = 0
+    }    
 }
 
-def motionDetectedTurnOnHandler(evt) 
+def roomsHandler()
 {
-    state.callMethod = "motionDetectedTurnOnHandler"
-    def device = evt.device
-    def deviceName = device.displayName
-    def deviceStatus = evt.value
-    
-    linfo("motion ${deviceName} to ${deviceStatus}, handle room lights accordingly")
-    state.lastmotiondt = nowDt()
-    state.lastmotionby = deviceName
-    unschedule()
-    
+    state.callMethod = "roomsHandler"
     if(aboutRoom == "h"){ handleHallway() }
-    
     /*
-    
     else if(aboutRoom == "mb"){ handleMasterBedroom() }
     else if(aboutRoom == "lr"){ handleLivingRoom() }
     else if(aboutRoom == "o"){ handleOffice() }
@@ -403,20 +428,63 @@ def motionDetectedTurnOnHandler(evt)
 	*/
 }
 
+
+def modeChangedHandler(evt) 
+{
+    state.callMethod = "modeChangedHandler"
+    def newMode = evt.value
+    linfo("Mode changed to ${newMode}")
+    if(getMode() != newMode)
+    {
+        linfo("Mode stays ${getMode()}, because of test")
+    }
+    if(  ["SleepAll", "Away"].contains(getMode())  ||  ["SleepSome"].contains(getMode()) && ["h","mb"].contains(aboutRoom) )
+    {
+        turnOffAllLights()
+        linfo("mode changed to${getMode()}, all lights off")
+    }
+    else
+    {
+        roomsHandler()
+    }
+}
+
+def darkSwitchHandler(evt) 
+{
+    state.callMethod = "darkSwitchHandler"
+    def device = evt.device
+    def deviceName = device.displayName
+    def deviceStatus = evt.value
+    linfo("darkSwitch ${deviceName} to ${deviceStatus}")
+    roomsHandler()
+}
+
+def motionDetectedTurnOnHandler(evt) 
+{
+    motionDetectedHandler(evt)
+    roomsHandler()
+}
 def motionDetectedKeepOnHandler(evt)
 {
-    state.callMethod = "motionDetectedKeepOnHandler"
+    motionDetectedHandler(evt)
+}
+
+
+def motionDetectedHandler(evt)
+{
+    state.callMethod = "motionDetectedHandler"
     def device = evt.device
     def deviceName = device.displayName
     def deviceStatus = evt.value
     
-    linfo("motion ${deviceName} to ${deviceStatus}, ${ isAnySwitchOn(allLights()) ? "keep on lights" : "" }")
-    if(isAnySwitchOn(allLights())) //WILL THIS CAUSE TROUBLE?
-    {
-    	state.lastmotiondt = nowDt()
-    	state.lastmotionby = deviceName    
-    	unschedule()
-    }
+    linfo("motion ${deviceName} to ${deviceStatus}, ${ isAnySwitchOn(allLights()) ? "keep on lights" : "turn on lights accordingly" }")
+    state.lastmotiondt = nowDt()
+    state.lastmotionby = deviceName    
+    unschedule()
+
+    // if(isAnySwitchOn(allLights())) //WILL THIS CAUSE TROUBLE?
+    // {
+    // }
 }
 
 def motionStoppedTurnOnHandler(evt) 
@@ -446,7 +514,7 @@ def motionStoppedReschedule(evt, m)
                 unschedule()
                 runIn(state.cfgStayon, checkMotionAndTurnOff)
                 state.turnofftime = addSecondsToNow(state.cfgStayon)
-                linfo("stopped ${deviceName}, lights off in ${state.cfgStayon}s at ${  state.turnofftime }")
+                linfo("motion stopped ${deviceName}, lights off in ${state.cfgStayon}s at ${  state.turnofftime }")
             }    
             else
             {
@@ -500,12 +568,12 @@ void turnOnLights(states, configs, lights, comment = "")
 
 def turnOffAllLights() 
 {
-    state.callMethod = "turnOffLights"
+    state.callMethod = "turnOffAllLights"
     //if(state.turnedonmanually && state.skippedTurningOff <= 10)
     if(state.turnedonmanually) //TODO state name change?
 	{
         state.skippedTurningOff = state.skippedTurningOff + 1
-        ldebug("Skip turn off, manually on.")
+        ldebug("Skip turn off, was manually turned on, skipped turning off: ${state.skippedTurningOff}")
     }
     else
     {
@@ -523,8 +591,15 @@ def turnOffLights(lights)
     state.callMethod = "turnOffLights"
     if(lights)
     {
-        linfo ("Turned off ${lights} lights")   
-        lights?.off()
+        if(isAnySwitchOn(lights))
+        {
+            linfo ("Turning off ${lights} lights")
+            lights?.off()
+        }
+        else
+        {
+            linfo ("Lights ${lights} already off")
+        }
     }
     else
     {
@@ -568,7 +643,7 @@ void handleLightsBasedOnConfig(states, configs, lights)
         }
         else if( !configs.values.turnon )
         {
-            turnOffLight(lights)
+            turnOffLights(lights)
         }
         else
         {
@@ -577,6 +652,11 @@ void handleLightsBasedOnConfig(states, configs, lights)
     }
 }
 //ACTIONS END
+
+
+
+
+
 
 //HANDLE ROOM START
 void handleHallway(manual = "")
@@ -649,8 +729,8 @@ void handleHallway(manual = "")
             lightGroupArray().each { grp ->
                 if(grp)
                 {
-                    ldebug("dynamic go through ${states.mode}, ${grp.id} and ${states.isDarkOrNoCfg}")
-                    def cfg = getConfig(states.mode, grp.id, states.isDarkOrNoCfg)    
+                    ldebug("dynamic go through ${states.mode}, ${grp.id} and ${states.isRoomState}")
+                    def cfg = getConfig(states.mode, grp.id, states.isRoomState)    
                     handleLightsBasedOnConfig(states, cfg, mainlights)                    
                 }
             }        
@@ -659,14 +739,6 @@ void handleHallway(manual = "")
 }
 
 //HANDLE ROOM END
-
-
-
-
-
-
-
-
 
 
 
@@ -881,11 +953,28 @@ def allStates()
     ldebug ("All states constructed")
     def currentmode = getMode()
     def isConsideredDark = isSwitchOn(isDarkSwitch) || luxSensor?.currentIlluminance < luxThreshold;
+
+    def determineRoomState = ""
+    if(isConsideredDark)
+    {
+        determineRoomState =  stateGroupArray()[0].id //"roomdoorsopen"
+
+        if(isAnyContactOpen(roomDoors))
+        {
+            determineRoomState =  stateGroupArray()[1].id //"roomdoorsopen"
+        }
+        if(isAnyContactOpen(houseDoors))
+        {
+            determineRoomState =  stateGroupArray()[2].id //"housedoorsopen"
+        }
+    }
+    ldebug("determineRoomState: ${determineRoomState}")
+
     return [mode:currentmode,
             isvalidmode: (includedModes && includedModes.contains(currentmode)),  
             isconsidereddark: isConsideredDark,
             isDarkOrNoCfg : isConsideredDark ? "dark" : "",
-            isAnyMotion:isAnyMotionActive(allMotionSensors()),
+            isAnyMotion: isAnyMotionActive(allMotionSensors()),
             isAnyLightOn : isAnySwitchOn(allLights()),
             isAnyLightOnMain : isAnySwitchOn(mainlights),
             isAnyLightOnSide : isAnySwitchOn(sidelights),
@@ -895,6 +984,7 @@ def allStates()
 			*/
             isDoorOpenRoom:isAnyContactOpen(roomDoors),
             isDoorOpenHouse:isAnyContactOpen(houseDoors),
+            isRoomState: determineRoomState,
             socketPlugPower:socketPlug?.currentValue("power"),
             isSocketPlugUsingPower:socketPlug?.currentValue("power") > powerThreshold,
             isWeekDay: ["Mon", "Tue", "Wed", "Thu", "Fri"].contains(new Date().format("E", location.timeZone)),
@@ -1108,6 +1198,19 @@ def nowDt(format = "yyyy-MM-dd'T'HH:mm:ss.SSS")
 {
     return new Date().format(format)
 }
+
+def parseToDate(dateString, format = "yyyy-MM-dd'T'HH:mm:ss.SSS") {
+    return Date.parse(format, dateString)
+}
+
+def calculateSecondsBetweenDates(Date startDate, Date endDate) {
+    // Calculate the difference in milliseconds
+    def differenceInMillis = endDate.time - startDate.time
+
+    // Convert milliseconds to seconds
+    return differenceInMillis / 1000
+}
+
 /*
 def retrieveDate(key, format = "yyyy-MM-dd'T'HH:mm:ss.SSS") 
 {
