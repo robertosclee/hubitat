@@ -13,7 +13,6 @@ definition(
     iconX2Url: ""
 )
 
-
 preferences {
 	page(name: "mainPage")
 }
@@ -93,20 +92,14 @@ width: 80px; float: left; border-bottom: 1px dotted #000;
     input "txtEnable", "bool", title: "Descriptive logging?", defaultValue: true, required: true, width: 4
     input "logEnable", "bool", title: "Extensive logging?", required: true, width: 4
 
-
     input "aboutRoom", "enum", title: "Select room", options: ["h", "lr", "mb", "g", "k", "s", "w", "o"], required: true, width: 6
     input "includedModes", "mode", title: "Applicable modes", multiple: true, required: false, width: 6
     input "sendMessage", "capability.notification", title: "Send to custom notification device (optional)", multiple: false, required: false, width: 6
     input "sendMessageImportant", "capability.notification", title: "Send to important notification device (optional)", multiple: false, required: false, width: 6
 
-
-
-
     input "enableManual", "bool", title: "Allow manually override. After turning on lights. No automation active until lights are turned off.", defaultValue: true, width: 8 
     input name: "Save", type: "button", title: "Save", submitOnChange: true    
 }
-        
-        
    
 //state.remove("configHistory")        
 //state.remove("usedConfigHistory")        
@@ -162,9 +155,6 @@ section("DEVICES", hideable: true, hidden: false)
     input "luxSensor", "capability.illuminanceMeasurement", title: "Lux sensor<br/>measured: <b>${luxSensor?.currentIlluminance}</b> since ${statesDevices}", required: false, width: 3
     
     input "luxThreshold", "number", title: "Lux Threshold", required: false, defaultValue: 50, width: 3
-    
-    
-
 
     //input "socketPlug", "capability.powerMeter", title: "Select socket plug, power in watts <b>measured: ${states.socketPlugPower}, is using power: ${states.isSocketPlugUsingPower}</b>", required: false
     //input "powerThreshold", "number", title: "Power threshold for it to be considered on (watts), <b>measured: ${states.socketPlugPower}, is using power: ${states.isSocketPlugUsingPower}</b>", required: false, defaultValue: 55
@@ -238,7 +228,7 @@ includedModes.each { mode ->
 
             }
             input name: "Save", type: "button", title: "Save", submitOnChange: true, width: 1  
-            input name: "AllLightsOff", type: "button", title: "All lights off", submitOnChange: true, width: 1
+            input name: "AllLightsOff", type: "button", title: "All lights off", submitOnChange: true, width: 3
         }
                
         
