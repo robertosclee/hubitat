@@ -426,21 +426,6 @@ def lightSwitchesHandler(evt)
     }    
 }
 
-def roomsHandler()
-{
-    state.turnedonmanually = false
-    state.callMethod = "roomsHandler"
-    if(aboutRoom == "h"){ handleHallway() }
-    /*
-    else if(aboutRoom == "mb"){ handleMasterBedroom() }
-    else if(aboutRoom == "lr"){ handleLivingRoom() }
-    else if(aboutRoom == "o"){ handleOffice() }
-    else if ( ["g", "k"].contains(aboutRoom) ) { handleSimpleMotion() }
-    //else if ( ["w", "s"].contains(aboutRoom) ) { handleSimpleDoor() }
-	*/
-}
-
-
 def modeChangedHandler(evt) 
 {
     state.callMethod = "modeChangedHandler"
@@ -692,6 +677,18 @@ void handleLightsBasedOnConfig(states, configs, lights)
 
 
 //HANDLE ROOM START
+def roomsHandler()
+{
+    state.turnedonmanually = false
+    state.callMethod = "roomsHandler"
+    if(aboutRoom == "h"){ handleHallway() }
+    else if(aboutRoom == "mb"){ handleMasterBedroom() }
+    else if(aboutRoom == "lr"){ handleLivingRoom() }
+    else if(aboutRoom == "o"){ handleOffice() }
+    else if ( ["g", "k"].contains(aboutRoom) ) { handleSimpleMotion() }
+    else if ( ["w", "s"].contains(aboutRoom) ) { handleSimpleDoor() }    
+}
+
 void handleHallway(manual = "")
 {
     state.callMethod = "handleHallway"
@@ -771,6 +768,227 @@ void handleHallway(manual = "")
     }    
 }
 
+
+void handleOffice()
+{
+    def callMethod = "handleOffice"
+    def currentMode = getMode()
+    def states = allStates()
+
+    if(states.isvalidmode)
+    {
+        if(false)
+        {
+        
+        }   
+        /*
+        else if(states.isAnyLightOnMain)
+        {
+            def cfg = getConfig(currentMode, "mainlights", "lightsmanuallyon")
+            handleLightsBasedOnConfig(states, cfg, mainlights)
+            
+            runIn(state.stayon, turnOffLights)
+        } 
+        */
+        else if(!states.isAnyLightOnMain)
+        {
+            mainlights.off()
+            unschedule()
+        }         
+    }    
+}
+
+void handleKidsRoom(manual = "") //LEX
+{
+    def callMethod = "handleKidsRoom"
+    def currentMode = getMode()
+    def states = allStates()
+    
+    if(states.isvalidmode)
+    {
+        if(false)
+        {
+        
+        }   
+        else if(states.isOpenRoomDoor)
+        {
+            def cfg = getConfig(currentMode, "mainlights", "roomdoorsopen")
+            handleLightsBasedOnConfig(states, cfg, mainlights)
+        }    
+        else if(!states.isOpenRoomDoor)
+        {
+            mainlights.off()
+        }         
+    }
+}
+
+void handleMasterBedroom(manual = "") 
+{
+    def callMethod = "handleMasterBedroom"
+    def currentMode = getMode()
+    def states = allStates()
+    logdebug("states ${states}", callMethod) 
+    
+    if(states.isvalidmode)
+    {
+        if(false)
+        {
+        
+        }   
+        else if(manual == "pushsingle")
+        {
+            handleLightsBasedOnConfig(states, getConfig("Normal", "mainlights", "buttonpushed"), mainlights)                        
+            handleLightsBasedOnConfig(states, getConfig("Normal", "sidelights", "buttonpushed"), sidelights)                 
+        }
+        else if(manual == "pushdouble")
+        {
+            handleLightsBasedOnConfig(states, getConfig("Normal", "mainlights", "buttondoublepushed"), mainlights)                        
+            handleLightsBasedOnConfig(states, getConfig("Normal", "sidelights", "buttondoublepushed"), sidelights)                        
+        }        
+        else if(manual == "pushheld")
+        {
+        }              
+        else if( ["SleepAll", "SleepSome", "SleepSomeEarlyWorkday"].contains(currentMode) )
+        {
+            def cfg = getConfig(currentMode, "sidelights", "dark")
+            handleLightsBasedOnConfig(states, cfg, sidelights)
+        }  
+        else if( ["Normal", "NormalWorking"].contains(currentMode) )
+        {
+            sidelights?.off()
+            def cfg = getConfig(currentMode, "mainlights", states.isDarkOrNoCfg)
+            handleLightsBasedOnConfig(states, cfg, mainlights)
+        }         
+        else
+        {
+            
+        }         
+    }
+}
+
+void handleLivingRoom(manual = "")
+{
+    def callMethod = "handleLivingRoom"
+    def currentMode = getMode()
+    def states = allStates()
+    logdebug("states ${states}", callMethod)   
+    
+    if(states.isvalidmode)
+    {
+
+        if(false)
+        {
+        
+        }   
+        else if( ["NormalDinner"].contains(currentMode) )
+        {
+            mainlights?.off()
+            sidelights?.off()
+            extralights2?.off()
+            handleLightsBasedOnConfig( states, getConfig(currentMode, "extralights1", states.isDarkOrNoCfg) , extralights1)
+        } 
+        else if( ["SleepSomeTv"].contains(currentMode) )
+        {
+            mainlights?.off()
+            sidelights?.off()
+            extralights1?.off()
+            handleLightsBasedOnConfig( states, getConfig(currentMode, "extralights2", states.isDarkOrNoCfg) , extralights2)
+        }            
+        else if( ["SleepSome", "SleepSomeEarlyWorkday"].contains(currentMode) && states.isSocketPlugUsingPower )
+        {
+            handleLightsBasedOnConfig(states, getConfig(currentMode, "mainlights", "istvon") , mainlights)
+            handleLightsBasedOnConfig(states, getConfig(currentMode, "sidelights", "istvon") , sidelights)
+        }  
+        else if( ["SleepSome","SleepSomeEarlyWorkday"].contains(currentMode) && !states.isSocketPlugUsingPower )
+        {
+            handleLightsBasedOnConfig( states, getConfig(currentMode, "mainlights", states.isDarkOrNoCfg) , mainlights)
+            handleLightsBasedOnConfig( states, getConfig(currentMode, "sidelights", states.isDarkOrNoCfg) , sidelights)
+        }  
+        else if( ["Normal", "NormalWorking"].contains(currentMode) )
+        {
+            sidelights?.off()
+            handleLightsBasedOnConfig(states, getConfig(currentMode, "mainlights", states.isDarkOrNoCfg) , mainlights)
+        }         
+        else
+        {
+            loginfo("Mode not configured ${currentMode}", callMethod)   
+        }      
+
+        /* NOT WORKING
+        lightGroupArray().each { group ->
+
+            handleLightsBasedOnConfig(states, getConfig(currentMode, group[0], states.isDarkOrNoCfg) , group[2])
+            //handleLightsBasedOnConfig( states, getConfig(currentMode, "sidelights", states.isDarkOrNoCfg) , sidelights)
+        } 
+		*/
+        
+    }
+}
+
+
+
+
+
+
+
+
+
+void handleSimpleMotion(manual = "") //LOW LIGHT AND MOTION ON OR OFF
+{
+    state.callMethod = "handleSimpleMotion"
+    def currentMode = getMode()
+    def states = allStates()
+    
+    if(states.isvalidmode)
+    {
+        if(false)
+        {
+        
+        } 
+        else
+        {
+            lightGroupArray().each { grp ->
+                if(grp)
+                {
+                    ldebug("dynamic go through ${states.mode}, ${grp.id} and ${states.isRoomState}")
+                    def cfg = getConfig(states.mode, grp.id, states.isRoomState)    
+                    handleLightsBasedOnConfig(states, cfg, grp.devices)                    
+                }
+            }             
+        }           
+    }
+}
+
+
+void handleSimpleDoor(manual = "") //CONTACT ON OR OFF
+{
+    state.callMethod = "handleSimpleDoor"
+    def currentMode = getMode()
+    def states = allStates()
+   
+    if(states.isvalidmode)
+    {
+        if(false)
+        {
+        
+        }   
+        else
+        {
+            if(isAnyContactOpen(roomDoors))
+            {
+                def cfg = getConfig(currentMode, "mainlights", "roomdoorsopen")
+                handleLightsBasedOnConfig(states, cfg, mainlights)
+                runIn(state.cfgStayon, turnOffAllLights)
+            }
+            else
+            {
+                mainlights.off()
+                unschedule()
+            }
+        }    
+    
+    }
+}
 //HANDLE ROOM END
 
 
