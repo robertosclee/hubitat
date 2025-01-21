@@ -1,0 +1,366 @@
+definition(
+    name: "🚀State Monitor doors and lights",
+    namespace: "RL",
+    author: "Roberto Lee",
+    description: "Monitors lights and doors. After a state change, waits 3 seconds, then sends a message with the list of lights that are on and doors that are open.",
+    category: "Convenience",
+    iconUrl: "",
+    iconX2Url: ""
+)
+
+preferences {
+    section("Settings") {
+        input "groupChanges", "bool", title: "Group changes with a slight delay? Otherwise notify on every change", required: true
+    }
+    section("Select Lights to Monitor") {
+        input "lights", "capability.switch", title: "Which lights?", multiple: true, required: false
+    }
+    section("Select Doors to Monitor") {
+        input "doors", "capability.contactSensor", title: "Which doors?", multiple: true, required: false
+    }
+    section("Select Motion Sensors to Monitor") {
+        input "motionsensors", "capability.motionSensor", title: "Which motion sensors?", multiple: true, required: false
+    }
+    section("Manual Trigger") {
+        input "manualMotionTrigger", "capability.switch", title: "Manual Motion Trigger", required: false
+    }
+    section("Turn all lights off") {
+        input "manualLightsOffTrigger", "capability.switch", title: "All lights off trigger", multiple: false, required: true
+    }    
+    section("Message Notification") {
+        input "sendPush", "bool", title: "Send Push Notification?", required: true, defaultValue: true
+        input "sendSMS", "phone", title: "Send SMS Notification to this number (optional)", required: false
+        input "sendCustomMessage", "capability.notification", title: "Send to custom notification device (optional)", multiple: true, required: false
+    }
+    section("Scheduled Notification") {
+        input "sendCustomScheduledMessage", "capability.notification", title: "Scheduled send to notifications device (optional)", multiple: true, required: false
+    }    
+    section("Actions:") {
+        input name: "testButton", type: "button", title: "Test", submitOnChange: true
+    }    
+}
+
+def installed() {
+    initialize()
+}
+
+def updated() {
+    unsubscribe()
+    initialize()
+}
+
+def initialize() {
+    if (lights) {
+        subscribe(lights, "switch", stateChangeHandler)
+    }
+    if (doors) {
+        subscribe(doors, "contact", stateChangeHandler)
+    }
+    if (motionsensors) {
+       subscribe(motionsensors, "motion", motionHandler)
+    }
+    if (manualMotionTrigger) {
+        subscribe(manualMotionTrigger, "switch.on", manualMotionHandler)
+    }
+    
+    subscribe(manualLightsOffTrigger, "switch", manualLightsOffTriggerHandler)
+
+    subscribe(location, "mode", modeChangeHandler)
+    
+    // Schedule the check
+    runIn(1, scheduledCheck)    
+}
+
+def modeChangeHandler(evt) {
+    log.debug "Mode changed to: ${evt.value}"
+    sendCustomMessage.deviceNotification("Mode changed to: ${evt.value}")
+    if (location.mode == "SleepAll")
+    {
+        def excludePartialNames = ["kids"]
+        turnOffLightsExcept(excludePartialNames)
+    }    
+    if (location.mode == "Away")
+    {
+        def excludePartialNames = []
+        turnOffLightsExcept(excludePartialNames)
+    }        
+}
+
+def appButtonHandler(buttonName) {
+    log.debug "Button pressed: ${buttonName}"
+    if (buttonName == "testButton") {
+        unschedule(checkStateAndNotify)
+        runIn(1, checkStateAndNotify, [data: [source: 'test']])
+      //  runIn(60*15, scheduledCheck)
+    }
+}
+
+def manualMotionHandler(evt) 
+{
+    unschedule(checkStateAndNotify)
+    runIn(1, checkStateAndNotify, [data: [source: 'manualmotion']])
+    //runIn(60*15, scheduledCheck)
+}
+
+def turnOffLightsExcept(excludePartialNames = []) {
+    def lightsOn = lights ? lights.findAll { 
+        it.currentSwitch == "on" && 
+        !excludePartialNames.any { partial -> it.displayName.contains(partial) }
+    }.sort { a, b -> a.displayName <=> b.displayName } : []
+    def lightsOnNames = lightsOn.collect { it.displayName }.join(", ")
+    log.debug "Turning off ${lights.size()} lights" 
+    sendCustomMessage.deviceNotification("Turning off ${lightsOn.size()} lights, ${lightsOnNames}")
+    lightsOn.each { light ->
+        light.off() // Turns off the light
+    } 
+}
+
+def manualLightsOffTriggerHandler(evt) 
+{
+    //log.debug "Button ${evt.device.displayName} was pushed---"
+    //log.debug "lights ${lights}" 
+    def lightsOn = lights ? lights.findAll { it.currentSwitch == "on" }.sort { a, b -> a.displayName <=> b.displayName } : []
+    def lightsOnNames = lightsOn.collect { it.displayName }.join(", ")
+    log.debug "Turning off all ${lights.size()} lights in house" 
+    sendCustomMessage.deviceNotification("Turning off all ${lightsOn.size()} lights\n#watcher, ${lightsOnNames}")
+    lightsOn.each { light ->
+        light.off() // Turns off the light
+        //log.debug "❌${light.displayName} turned off"
+        //sendCustomMessage.deviceNotification("❌${light.displayName} turned off")
+    }    
+}
+
+
+
+def dimLightsGradually(lights, durationMinutes = 1, steps = 10) {
+    if (!lights || lights.isEmpty()) {
+        log.warn "No lights specified to dim."
+        return
+    }
+    
+    // Calculate the time between each step
+    def stepInterval = (durationMinutes * 60 * 1000) / steps // Convert minutes to milliseconds
+    def stepLevel = 100 / steps // Brightness level reduction per step
+    
+    // Start the dimming process
+    def dimStep = { int currentStep ->
+        if (currentStep > steps) {
+            // Turn off the lights after the final step
+            lights.each { it.off() }
+            log.info "All lights turned off after dimming."
+        } else {
+            // Calculate the target brightness level for this step
+            def targetLevel = Math.max(0, 100 - (currentStep * stepLevel))
+            log.debug "Dimming lights to ${targetLevel}% at step ${currentStep}."
+            
+            // Set the brightness for each light
+            lights.each { light ->
+                if (light.hasCommand("setLevel")) {
+                    light.setLevel(targetLevel)
+                } else {
+                    log.warn "${light.displayName} does not support setLevel command."
+                }
+            }
+            
+            // Schedule the next dimming step
+            runInMillis(stepInterval, dimStep, [data: [currentStep: currentStep + 1]])
+        }
+    }
+    
+    // Start the process
+    log.info "Starting dimming process for lights over ${durationMinutes} minutes in ${steps} steps."
+    dimStep(1)
+}
+
+
+
+
+
+
+
+
+
+def motionHandler(evt) 
+{
+
+    def motionActive = motionsensors ? motionsensors.findAll { it.currentMotion == "active" } : []
+    motionActive.each { m ->
+        //light.off() // Turns off the light
+       // log.debug "${light.displayName} turned off"
+    }    
+    
+    if(motionActive.size > 0 && ["SleepAll", "Away"].contains(location.mode))
+    {
+        def actives = motionActive.collect { it.displayName }.join("\n")
+        if (sendCustomMessage && (location.mode == "SleepAll" || location.mode == "Away")  ) 
+        {
+            sendCustomMessage.deviceNotification("${location.mode}, \n${actives}")     
+        }
+
+        if(sendCustomScheduledMessage && location.mode == "Away")
+        {
+            sendCustomScheduledMessage.each { device ->
+                if (device.hasCapability("Notification")) 
+                {
+                    device.deviceNotification("!!!${location.mode}, \n${actives}")
+                    log.debug "Sent notification to ${device.displayName}"
+                } 
+                else 
+                {
+                    log.warn "Device ${device.displayName} does not support notifications."
+                }
+            }  
+        }    
+    }
+}
+
+def stateChangeHandler(evt) 
+{
+    log.debug "State changed: ${evt.displayName} is ${evt.value}"
+    if (sendCustomMessage && !groupChanges) 
+    {
+        sendCustomMessage.deviceNotification("${evt.value == "off" ? "❌" : ""} ${evt.displayName}")
+    }
+    if(groupChanges)
+    {
+        unschedule(checkStateAndNotify)
+        runIn(5, checkStateAndNotify, [data: [source: 'stateChange']])        
+    }    
+}
+
+def scheduledCheck() 
+{
+    unschedule(checkStateAndNotify)
+    runIn(3, checkStateAndNotify, [data: [source: 'scheduleCheck']])
+    runIn(60*15, scheduledCheck) //EVERY 15 MIN
+}
+
+def checkStateAndNotify(data) 
+{
+    def source = data?.source ?: "unknown"
+    //log.debug "checkStateAndNotify called by: ${source}"
+    
+    def lightsOn = lights ? lights.findAll { it.currentSwitch == "on" }.sort { a, b -> a.displayName <=> b.displayName } : []
+    def openDoors = doors ? doors.findAll { it.currentContact == "open" }.sort { a, b -> a.displayName <=> b.displayName } : []
+   
+    def lightNames = lightsOn.collect { it.displayName }.join("\n")
+    def doorNames = openDoors.collect { it.displayName }.join("\n")
+
+    def message = "💡:${lightsOn.size()}  🚪:${openDoors.size()}\n"
+    def messagedoors = "🚪:${openDoors.size()}\n"
+    def messagelights = "💡:${lightsOn.size()}\n"
+    if (lightsOn) 
+    {
+        message += "${lightNames}\n"
+        messagelights += "${lightNames}\n"
+    }
+    if (openDoors) 
+    {
+        message += "${doorNames}\n"
+        messagedoors += "${doorNames}\n"
+    }
+
+    if (message) 
+    {
+        /*
+        if (sendPush) 
+        {
+            log.debug "sendPush"
+            sendPush(message)
+        }
+        if (sendSMS) 
+        {
+            sendSms(sendSMS, message)
+        }
+        */
+        if (sendCustomMessage) 
+        {
+            //log.debug "sendCustomMessage"
+            sendCustomMessage.deviceNotification(message)
+        }
+        /*
+        if (sendCustomScheduledMessage && source == "test" && (lightsOn.size() > 0 || openDoors.size() > 0) ) {
+            log.debug "sendCustomScheduledMessage"
+            sendCustomScheduledMessage.deviceNotification(message)
+        }
+        */
+        if((lightsOn.size() == 0 && openDoors.size() == 0) && state.somethingwasonoropen == true)
+        {
+            state.somethingwasonoropen = false
+            sendCustomScheduledMessage.each { device ->
+                //log.debug "Sending notification to ${device.displayName}"
+                if (device.hasCapability("Notification")) {
+                    device.deviceNotification(message)
+                    log.debug "Sent notification to ${device.displayName}"
+                } 
+                else 
+                {
+                    log.warn "Device ${device.displayName} does not support notifications."
+                }
+            }             
+        }
+        
+        if(source == "scheduleCheck" && (lightsOn.size() > 0 || openDoors.size() > 0))
+        {
+            state.somethingwasonoropen = true
+            if(lightsOn.size() > 0)
+            {
+                state.somethingwason = true
+            }
+            if(openDoors.size() > 0)
+            {
+                state.somethingwasopen = true
+            }
+                        
+            sendCustomScheduledMessage.each { device ->
+                //log.debug "Sending notification to ${device.displayName}"
+                if (device.hasCapability("Notification")) 
+                {
+                    device.deviceNotification(message)
+                    log.debug "Sent notification to ${device.displayName}"
+                } 
+                else 
+                {
+                    log.warn "Device ${device.displayName} does not support notifications."
+                }
+            }        
+        }
+        
+        if(location.mode == "SleepAll" && openDoors.size() > 0)
+        {
+            sendCustomScheduledMessage.each { device ->
+                //log.debug "Sending notification to ${device.displayName}"
+                if (device.hasCapability("Notification")) 
+                {
+                    device.deviceNotification("SLEEPING? ${location.mode} \n${messagedoors}")
+                    log.debug "Sent notification to ${device.displayName}"
+                } 
+                else 
+                {
+                    log.warn "Device ${device.displayName} does not support notifications."
+                }
+            }        
+        }              
+        
+        if(location.mode == "Away" && (lightsOn.size() > 0 || openDoors.size() > 0))
+        {
+            sendCustomScheduledMessage.each { device ->
+                //log.debug "Sending notification to ${device.displayName}"
+                if (device.hasCapability("Notification")) 
+                {
+                    device.deviceNotification("MODE: ${location.mode} BUT \n${message}")
+                    log.debug "Sent notification to ${device.displayName}"
+                } 
+                else 
+                {
+                    log.warn "Device ${device.displayName} does not support notifications."
+                }
+            }        
+        }        
+        log.info message
+    } 
+    else 
+    {
+        log.info "No lights on or doors open."
+    }
+}

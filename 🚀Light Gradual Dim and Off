@@ -1,0 +1,135 @@
+definition(
+    name: "🚀Light Gradual Dim and Off",
+    namespace: "RL",
+    author: "Roberto Lee",
+    description: "Turns on a light, dims it gradually, and turns it off after 1 hour. Restarts if triggered again when a virtual button is pressed.",
+    category: "Convenience",
+    iconUrl: "",
+    iconX2Url: ""
+)
+
+preferences {
+    section("Select Light") {
+        input "light", "capability.switchLevel", title: "Light to Control", required: true
+    }
+    section("Virtual Button") {
+        input "virtualButton", "capability.switch", title: "Virtual Button to Trigger", required: true
+    }
+    section("Dimming Settings") {
+        input "startBrightness", "number", title: "Start Brightness (1-100)", required: true, defaultValue: 100
+        input "totalDimmingTime", "number", title: "Total Dimming Time (minutes)", required: true, defaultValue: 60
+        input "dimInterval", "number", title: "Dim Every X Seconds", required: true, defaultValue: 60
+    }
+}
+
+def installed() {
+    initialize()
+}
+
+def updated() {
+    unschedule()
+    initialize()
+}
+
+def initialize() {
+    unsubscribe()
+
+    if(virtualButton)
+    {
+        subscribe(virtualButton, "switch.on", routineHandler) // Trigger routine when button is pushed
+    }
+    
+    if(light)
+    {
+        subscribe(light, "switch.off", lightSwitchedOffHandler)
+    }    
+}
+
+def lightSwitchedOffHandler(evt)
+{
+    def device = evt.device // The device that triggered the event
+    def deviceName = device.displayName // Get the name of the light
+    def deviceStatus = evt.value // Get the value (should be "off" in this case)
+    
+    log.debug "${device.displayName} turned off, end running routine."
+    
+    unschedule() // Cancel any ongoing dimming process
+}
+
+def routineHandler(evt) 
+{
+    def device = evt.device // The device that triggered the event
+    def deviceName = device.displayName // Get the name of the light
+    def deviceStatus = evt.value // Get the value (should be "off" in this case)
+    
+    log.debug "${device.displayName} pressed, triggering routine. Start at ${startBrightness}%"
+    unschedule() // Cancel any ongoing dimming process
+    state.currentLevel = startBrightness.toDouble()
+    light.setLevel(startBrightness)
+    calculateDimmingSteps()
+    runIn(1, gradualDim)
+}
+
+
+def calculateDimmingSteps() {
+    // Calculate the total number of steps based on total dimming time and interval
+    def totalSteps = totalDimmingTime * 60 / dimInterval
+    //state.dimStepSize = (startBrightness / totalSteps).toInteger() // Determine how much to dim each step
+    state.dimStepSize = (startBrightness / totalSteps) // Determine how much to dim each step
+    log.debug "Total Steps: ${totalSteps}, Step Size: ${state.dimStepSize}, Every ${dimInterval}s"
+    
+    // Ensure dimStepSize is at least 1
+    /*
+    if (state.dimStepSize < 1) {
+        state.dimStepSize = 1
+        totalSteps = startBrightness // Recalculate total steps for a step size of 1
+    }    
+    state.totalSteps = totalSteps // Store the updated total steps for reference
+    log.debug "Recalculated, Total Steps: ${totalSteps}, Step Size: ${state.dimStepSize}, Every ${dimInterval}s"
+    */
+}
+
+def gradualDim() 
+{
+    /*
+    def currentLevel = light.currentLevel ?: startBrightness
+    if (currentLevel > 0) {
+        def newLevel = Math.max((int)currentLevel - (int)state.dimStepSize, 0)
+        light.setLevel(newLevel)
+        if (newLevel > 0) 
+        {
+            //log.debug "dimInterval: ${dimInterval}"
+            runIn(dimInterval, gradualDim)
+        } else {
+            runIn(60, turnOffLight) // Wait a bit before turning off
+            log.debug "Wait before turning off."
+        }
+    }
+    */
+    if (state.currentLevel > 0) {
+        state.currentLevel = Math.max(state.currentLevel - state.dimStepSize, 0.0) // Decrease brightness
+       
+        log.debug "Dim to ${state.currentLevel} -> ${roundUp(state.currentLevel)}"
+        light.setLevel(roundUp(state.currentLevel)) // Set light brightness as an integer .toInteger()
+        
+
+        if (state.currentLevel > 0) {
+            runIn(dimInterval, gradualDim)
+        } else {
+            runIn(60, turnOffLight) // Wait a bit before turning off
+        }
+    }    
+}
+
+def turnOffLight() {
+    light.off()
+    log.debug "Dimming light turned off."
+}
+
+def roundUp(decimal) {
+    return Math.ceil(decimal) as int
+}
+
+def roundToNearest(decimal) {
+    return Math.round(decimal) as int
+}
