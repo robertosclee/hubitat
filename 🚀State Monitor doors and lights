@@ -40,7 +40,7 @@ def logwarn(message, methodName ="")
     {
         state.logPostfix = methodName
     }
-    log.warn "[⚙️${state.logPrefix}] ${message} ➜${state.logPostfix}"
+    log.warn "[⚙️${state.logPrefix}] ${state.logPostfix} ➜ ${message}"
 }
 
 
@@ -50,7 +50,7 @@ def logdebug(message, methodName ="")
     {
         state.logPostfix = methodName
     }
-    log.debug "[⚙️${state.logPrefix}] ${message} ➜${state.logPostfix}"
+    log.debug "[⚙️${state.logPrefix}] ${state.logPostfix} ➜ ${message}"
 }
 
 def loginfo(message, methodName ="") 
@@ -59,7 +59,7 @@ def loginfo(message, methodName ="")
     {
         state.logPostfix = methodName
     }
-    log.info "[⚙️${state.logPrefix}] ${message} ➜${state.logPostfix}"
+    log.info "[⚙️${state.logPrefix}] ${state.logPostfix} ➜ ${message}"
 }
 
 def installed() 
@@ -79,10 +79,10 @@ def initialize()
     unsubscribe()
     
     if (lights) {
-        subscribe(lights, "switch", stateChangeHandler)
+        subscribe(lights, "switch", lightsChangeHandler)
     }
     if (doors) {
-        subscribe(doors, "contact", stateChangeHandler)
+        subscribe(doors, "contact", doorsChangeHandler)
     }
     if (motionsensors) {
        subscribe(motionsensors, "motion", motionHandler)
@@ -96,10 +96,10 @@ def initialize()
 
     subscribe(location, "mode", modeChangeHandler)
     
-    runIn(1, checkStateAndNotify, [data: [source: 'initialize']])
+    //runIn(1, checkStateAndNotify, [data: [source: 'initialize']])
 
     // Schedule the check
-    runIn(3, schedulerCheck)    
+    runIn(1, schedulerCheck)    
     
     loginfo("watcher engine restarted",callMethod)
 }
@@ -109,16 +109,33 @@ def modeChangeHandler(evt)
     def callMethod = "modeChangeHandler"
     logdebug("Mode changed to: ${evt.value}",callMethod)
     sendImportant.deviceNotification("Mode changed to: ${evt.value}\n#watcher")
-    if (location.mode == "SleepAll")
+    if ( ["SleepAll", "SleepSome"].contains(location.mode) )
     {
         def excludePartialNames = ["kids"]
-        turnOffLightsExcept(excludePartialNames)
+        turnOffLightsExcept(callMethod, excludePartialNames)
+    }    
+
+    if ( ["Away"].contains(location.mode) )
+    {
+        def excludePartialNames = []
+        turnOffLightsExcept(callMethod, excludePartialNames)
+    }        
+}
+
+def manualLightsOffTriggerHandler(evt) 
+{
+    def callMethod = "manualLightsOffTriggerHandler"
+
+    if (["SleepAll", "SleepSome"].contains(location.mode))
+    {
+        def excludePartialNames = ["kids"]
+        turnOffLightsExcept(callMethod, excludePartialNames)
     }    
     if (location.mode == "Away")
     {
         def excludePartialNames = []
-        turnOffLightsExcept(excludePartialNames)
-    }        
+        turnOffLightsExcept(callMethod, excludePartialNames)
+    }  
 }
 
 def appButtonHandler(buttonName) 
@@ -137,69 +154,21 @@ def manualCheckHandler(evt)
     runIn(3, checkStateAndNotify, [data: [source: callMethod]])    
 }
 
-
-def manualLightsOffTriggerHandler(evt) 
-{
-    def callMethod = "manualLightsOffTriggerHandler"
-
-    if (["SleepAll", "SleepSome"].contains(location.mode))
-    {
-        def excludePartialNames = ["kids"]
-        turnOffLightsExcept(excludePartialNames)
-    }    
-    if (location.mode == "Away")
-    {
-        def excludePartialNames = []
-        turnOffLightsExcept(excludePartialNames)
-    }  
-}
-
 def motionHandler(evt) 
 {
     def callMethod = "motionHandler"
-    runIn(3, checkStateAndNotify, [data: [source: callMethod]])
-
-    /*
-    def motionActive = motionsensors ? motionsensors.findAll { it.currentMotion == "active" } : []
-    motionActive.each { m ->
-        //light.off() // Turns off the light
-       // log.debug "${light.displayName} turned off"
-    }    
-    
-    if(motionActive.size > 0 && ["SleepAll", "Away"].contains(location.mode))
-    {
-        def actives = motionActive.collect { it.displayName }.join("\n")
-        if (sendMessageLog && (location.mode == "SleepAll" || location.mode == "Away")  ) 
-        {
-            sendMessageLog.deviceNotification("${location.mode}, \n${actives}")     
-        }
-
-        if(sendImportant && location.mode == "Away")
-        {
-            sendImportant.each { device ->
-                if (device.hasCapability("Notification")) 
-                {
-                    device.deviceNotification("!!!${location.mode}, \n${actives}")
-                    logdebug("Sent notification to ${device.displayName}",callMethod)
-                } 
-                else 
-                {
-                    logwarn("Device ${device.displayName} does not support notifications.",callMethod)
-                }
-            }  
-        }    
-    }
-    */
+    logdebug("Motion: ${evt.displayName} is ${evt.value}",callMethod)
+    //runIn(10, checkStateAndNotify, [data: [source: callMethod]])
 }
 
-def stateChangeHandler(evt) 
+def lightsChangeHandler(evt) 
 {
-    def callMethod = "stateChangeHandler"
+    def callMethod = "lightsChangeHandler"
     
-    logdebug("State changed: ${evt.displayName} is ${evt.value}",callMethod)
+    logdebug("Light changed: ${evt.displayName} is ${evt.value}",callMethod)
     if(groupChanges)
     {
-        runIn(3, checkStateAndNotify, [data: [source: callMethod]])    
+        runIn(8, checkStateAndNotify, [data: [source: callMethod]])    
     }    
     else
     {
@@ -207,6 +176,20 @@ def stateChangeHandler(evt)
     }
 }
 
+def doorsChangeHandler(evt) 
+{
+    def callMethod = "doorsChangeHandler"
+    
+    logdebug("Door changed: ${evt.displayName} is ${evt.value}",callMethod)
+    if(groupChanges)
+    {
+        runIn(1, checkStateAndNotify, [data: [source: callMethod]])    
+    }    
+    else
+    {
+        sendMessageLog.deviceNotification("${evt.value == "off" ? "❌" : ""} ${evt.displayName}")
+    }
+}
 
 def schedulerCheck(data) 
 {
@@ -214,9 +197,10 @@ def schedulerCheck(data)
     def source = data?.source ?: "unknown"    
 
     unschedule()
-    //runIn(3, checkStateAndNotify, [data: [source: 'schedulerCheck']])
+    runIn(3, checkStateAndNotify, [data: [source: callMethod]])
     //runIn(60*runInMinutes, schedulerCheck) //EVERY 15 MIN
     runIn(60*runInMinutes, schedulerCheck, [data: [source: callMethod]]) //EVERY 15 MIN
+    logdebug("watcher reschedule", callMethod)
 }
 
 def checkStateAndNotify(data) 
@@ -229,35 +213,33 @@ def checkStateAndNotify(data)
     def lightsOn = lights ? lights.findAll { it.currentSwitch == "on" }.sort { a, b -> a.displayName <=> b.displayName } : []
     def openDoors = doors ? doors.findAll { it.currentContact == "open" }.sort { a, b -> a.displayName <=> b.displayName } : []
     def motionActive = motionsensors ? motionsensors.findAll { it.currentMotion == "active" }.sort { a, b -> a.displayName <=> b.displayName } : []
-   
-    def lightNames = lightsOn.collect { it.displayName }.join("\n")
-    def doorNames = openDoors.collect { it.displayName }.join("\n")
-    def motionNames = motionActive.collect { it.displayName }.join("\n")
 
-    def message = "💡:${lightsOn.size()}/${lights.size()} 🚪:${openDoors.size()}/${doors.size()}  👋:${openDoors.size()}/${motionsensors.size()}\n"
-    def messagedoors = "🚪:${openDoors.size()}\n"
-    def messagelights = "💡:${lightsOn.size()}\n"
-    def messagemotions = "👋:${motionNames.size()}\n"
+    def message = "💡:${lightsOn.size()}/${lights.size()} 🚪:${openDoors.size()}/${doors.size()} 👋:${motionActive.size()}/${motionsensors.size()}"
+    //def messagedoors = "🚪:${openDoors.size()}"
+    //def messagelights = "💡:${lightsOn.size()}"
+    //def messagemotions = "👋:${motionNames.size()}"
     if (lightsOn) 
     {
-        message += "${lightNames}\n"
-        messagelights += "${lightNames}\n"
+        def lightNames = lightsOn.collect { it.displayName }.join("\n")
+        message += "\n${lightNames}"
+        //messagelights += "\n${lightNames}"
     }
     if (openDoors) 
     {
-        message += "${doorNames}\n"
-        messagedoors += "${doorNames}\n"
+        def doorNames = openDoors.collect { it.displayName }.join("\n")
+        message += "\n${doorNames}"
+        //messagedoors += "\n${doorNames}"
     }
-    if (messagemotions) 
+    if (motionActive && ["SleepAll", "Away"].contains(location.mode) ) 
     {
-        message += "${motionNames}\n"
-        messagemotions += "${motionNames}\n"
+        def motionNames = motionActive.collect { it.displayName }.join("\n")
+        message += "\n${motionNames}"
+        //messagemotions += "\n${motionNames}"
     }    
 
-    if (message) 
-    {
+    if (message) {
         //message += " | watching total of ${lights.size()} lights, ${doors.size()} doors, ${motionsensors.size()} motion sensors\n"        
-		message += "#watcher #${source}"
+		message += "\n#watcher #${source}"
         /*
         if (sendPush) 
         {
@@ -269,88 +251,76 @@ def checkStateAndNotify(data)
             sendSms(sendSMS, message)
         }
         */
+
+        
+        def urgentText = ""
+
         if (sendMessageLog) 
         {
             //log.debug "sendMessageLog"
-            sendMessageLog.deviceNotification(message)
-        }
-        /*
-        if (sendImportant && source == "test" && (lightsOn.size() > 0 || openDoors.size() > 0) ) {
-            log.debug "sendImportant"
-            sendImportant.deviceNotification(message)
-        }
-        */
-        //STATE CHANGED TO IDLE, NOTIFY ONCE
-        if((lightsOn.size() == 0 && openDoors.size() == 0) && state.somethingwasonoropen == true)
-        {
-            state.somethingwasonoropen = false
-            sendImportant.each { device ->
-                //log.debug "Sending notification to ${device.displayName}"
-                if (device.hasCapability("Notification")) 
-                {
-                    device.deviceNotification(message)
-                    logdebug("Sent notification to ${device.displayName}",callMethod)
-                } 
-                else 
-                {
-                    logwarn("Device ${device.displayName} does not support notifications.",callMethod)
-                }
-            }             
-        }
-        
-        if(source == "scheduleCheck" && (lightsOn.size() > 0 || openDoors.size() > 0))
-        {
-            if(lightsOn.size() > 0)
-            {
-                state.somethingwason = true
-            }
-            if(openDoors.size() > 0)
-            {
-                state.somethingwasopen = true
-            }
-                        
+            //sendMessageLog.deviceNotification(message)
             sendMessageLog.each { device ->
-                if (device.hasCapability("Notification")) 
-                {
-                    device.deviceNotification(message)
-                    logdebug("Sent notification to ${device.displayName}",callMethod)
-                } 
+                if (device.hasCapability("Notification")) {
+                    device.deviceNotification("${message}")
+                    logdebug("log: ${urgentText}${message}",callMethod)
+                }
                 else 
                 {
                     logwarn("Device ${device.displayName} does not support notifications.",callMethod)
+                }                     
+            }            
+        }
+
+
+        if (sendImportant) 
+        {
+            def doNotifyImportant = false
+            
+            // Notify if source is manualCheckHandler
+            if (source == "manualCheckHandler") {
+                doNotifyImportant = true
+            }
+
+            // Notify if last check had something on or open, even if nothing is on or open now
+            if (state.somethingwasonoropen && (lightsOn.size() == 0 && openDoors.size() == 0)) {
+                doNotifyImportant = true
+            }
+
+            if(
+                ( location.mode == "Away" && (lightsOn.size() > 0 || openDoors.size() > 0 || motionActive.size() > 0 ) )
+                ||
+                ( ["SleepAll", "Away"].contains(location.mode) && openDoors.size() > 0 )
+            )
+            {
+                doNotifyImportant = true
+                urgentText = "\nMODE: ${location.mode.toUpperCase()}, BUT"
+            }   
+
+            if (doNotifyImportant) {
+                state.somethingwasonoropen = false
+                sendImportant.each { device ->
+                    if (device.hasCapability("Notification")) 
+                    {
+                        device.deviceNotification("${urgentText}${message}")
+                        logdebug("important: ${urgentText}${message}",callMethod)
+                    }
+                    else 
+                    {
+                        logwarn("Device ${device.displayName} does not support notifications.",callMethod)
+                    }                     
                 }
-            }        
+            }    
+
+            // Update state for next check
+            state.somethingwasonoropen = (lightsOn.size() > 0 || openDoors.size() > 0)                    
         }
         
-        
-        if(
-            ( location.mode == "Away" && (lightsOn.size() > 0 || openDoors.size() > 0 || motionActive.size() > 0 ) )
-            ||
-            ( ["SleepAll", "Away"].contains(location.mode) && openDoors.size() > 0 )
-        )
-        {
-            state.somethingwasonoropen = true
-            sendImportant.each { device ->
-                if (device.hasCapability("Notification")) 
-                {
-                    device.deviceNotification("MODE: ${location.mode.toUpperCase()}, BUT \n${message}")
-                    logdebug("SLEEPING/AWAY? ${location.mode} \n${messagedoors}, Sent notification to ${device.displayName}",callMethod)
-                } 
-                else 
-                {
-                    logwarn("Device ${device.displayName} does not support notifications.",callMethod)
-                }
-            }        
-        }        
-        loginfo(message,callMethod)
-    } 
-    else 
-    {
+    }  else {
         loginfo("No lights on or doors open.",callMethod)
     }
 }
 
-def turnOffLightsExcept(excludePartialNames = []) 
+def turnOffLightsExcept(triggerMethod, excludePartialNames = []) 
 {
     def callMethod = "turnOffLightsExcept"
     
@@ -362,11 +332,11 @@ def turnOffLightsExcept(excludePartialNames = [])
     def lightsOnNames = lightsOn.collect { it.displayName }.join(", ")
     def exceptNames = excludePartialNames.size > 0 ? ", except ${excludePartialNames.collect { it }.join(", ")}" : ""
 
-    loginfo("Turning off ${lightsOn.size} of ${lights.size()} lights in house${exceptNames}",callMethod) 
-    sendMessageLog.deviceNotification("Turning off ${lightsOn.size} of ${lights.size()} lights in house${exceptNames}\n${lightsOnNames}\n#watcher")    
+    loginfo("Turning off ${lightsOn.size} of ${lights.size()} lights in house${exceptNames} #${triggerMethod}",callMethod) 
+    sendMessageLog.deviceNotification("Turning off ${lightsOn.size} of ${lights.size()} lights in house${exceptNames}\n${lightsOnNames}\n#watcher #${triggerMethod}")    
     
     lightsOn.each { light ->
-        logdebug("Turning off ${light.displayName}",callMethod)
+        logdebug("Turning off ${light.displayName}\n#${triggerMethod}",callMethod)
         light.off() 
     } 
 }
