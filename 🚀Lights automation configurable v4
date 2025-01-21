@@ -544,7 +544,7 @@ def motionStoppedKeepOnHandler(evt)
 
 def motionStoppedReschedule(evt, m)
 {
-    state.callMethod = m
+    state.callMethod = "${m} > motionStoppedReschedule"
     def device = evt.device // The device that triggered the event
     def deviceName = device.displayName // Get the name of the light
     def deviceStatus = evt.value // Get the value (should be "off" in this case)    
@@ -693,17 +693,35 @@ def turnOffLights(lights)
 def checkMotionAndTurnOff() 
 {
     state.callMethod = "checkMotionAndTurnOff"
-
-    if (!isAnyMotionActive(allMotionSensors())) 
+    def currentMode = getMode()
+    ldebug(" [mb].contains(aboutRoom) : ${ ["mb"].contains(aboutRoom)}")
+    ldebug(" [SleepAll, SleepSome, SleepSomeEarlyWorkday].contains(currentMode) : ${["SleepAll", "SleepSome", "SleepSomeEarlyWorkday"].contains(currentMode)}")
+    ldebug("state.turnedonmanually : ${state.turnedonmanually } and isAnyMotionActive(motionSensorsTurnOn) : ${isAnyMotionActive(motionSensorsTurnOn)}")
+    
+    if( 
+                ["mb"].contains(aboutRoom)
+                && ["SleepAll", "SleepSome", "SleepSomeEarlyWorkday"].contains(currentMode) 
+                && !state.turnedonmanually 
+                && !isAnyMotionActive(motionSensorsTurnOn)
+                )
     {
+        state.callMethod = "checkMotionAndTurnOff"
         unschedule()
-        linfo ("No motion, turning lights off")    
+        linfo ("Room ${aboutRoom} and sleeping, ignore keep on and turn off lights")    
         turnOffAllLights()
-    } 
+    }    
+    else if (  !isAnyMotionActive(allMotionSensors()) ) 
+    {
+        state.callMethod = "checkMotionAndTurnOff"
+        unschedule()
+        linfo ("No motion, turning lights off and unschedule")    
+        turnOffAllLights()
+    }     
     else 
     {
+        state.callMethod = "checkMotionAndTurnOff"
         unschedule()
-        linfo ("Still motion, rescheduling turning off")    
+        linfo ("Still motion, rescheduling turning off lights with ${state.cfgStayon}s")    
         runIn(state.cfgStayon, checkMotionAndTurnOff) // Check again after 1 minute if motion persists
     }
 }
@@ -769,7 +787,16 @@ void handleHallway(manual = "")
         }        
         else if(manual == "pushheld")
         {
-        }                
+        }    
+
+        /*
+        else if(states.mode == "SleepAll")
+        {
+            mainlights.off()
+
+            def cfg = getConfig(states.mode, "sidelights", "roomdoorsopen")
+            handleLightsBasedOnConfig(states, cfg, sidelights)
+        } */                    
         //else if(states.mode == "SleepSome" && states.isOpenHouseDoor && states.isEarlyWorkTime)
         //(states.mode == "SleepSome" || states.mode == "SleepSomeEarlyWorkday")
         /*
@@ -883,30 +910,27 @@ void handleMasterBedroom(manual = "")
         }   
         else if(manual == "pushsingle")
         {
-            handleLightsBasedOnConfig(states, getConfig("Normal", "mainlights", "buttonpushed"), mainlights)                        
-            handleLightsBasedOnConfig(states, getConfig("Normal", "sidelights", "buttonpushed"), sidelights)                 
+            //handleLightsBasedOnConfig(states, getConfig("Normal", "mainlights", "buttonpushed"), mainlights)                        
+            //handleLightsBasedOnConfig(states, getConfig("Normal", "sidelights", "buttonpushed"), sidelights)                 
         }
         else if(manual == "pushdouble")
         {
-            handleLightsBasedOnConfig(states, getConfig("Normal", "mainlights", "buttondoublepushed"), mainlights)                        
-            handleLightsBasedOnConfig(states, getConfig("Normal", "sidelights", "buttondoublepushed"), sidelights)                        
+            //handleLightsBasedOnConfig(states, getConfig("Normal", "mainlights", "buttondoublepushed"), mainlights)                        
+            //handleLightsBasedOnConfig(states, getConfig("Normal", "sidelights", "buttondoublepushed"), sidelights)                        
         }        
         else if(manual == "pushheld")
         {
-        }              
+        }            
+        //WHEN SLEEPING, LIGHTS SHOULD GO OFF, EVEN IF KEEP ON HAS MOVEMENT, BUT NOT IF MANUALLY TURNED ON
         /*
-        else if( ["SleepAll", "SleepSome", "SleepSomeEarlyWorkday"].contains(currentMode) )
+        else if( ["SleepAll", "SleepSome", "SleepSomeEarlyWorkday"].contains(currentMode) 
+                    && !state.turnedonmanually 
+                    && !isAnyMotionActive(motionSensorsTurnOn)
+                    )
         {
-            def cfg = getConfig(currentMode, "sidelights", "dark")
-            handleLightsBasedOnConfig(states, cfg, sidelights)
-        }  
-        else if( ["Normal", "NormalWorking"].contains(currentMode) )
-        {
-            sidelights?.off()
-            def cfg = getConfig(currentMode, "mainlights", states.isDarkOrNoCfg)
-            handleLightsBasedOnConfig(states, cfg, mainlights)
-        }     
-        */    
+            turnOffAllLights()
+        }
+        */
         else
         {
             settingsHandler(states)
