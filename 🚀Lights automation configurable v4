@@ -1159,7 +1159,10 @@ def l(message, logPostfix = "", logLevel = debug)
     switch(logLevel.toLowerCase()) 
     {
         case 'debug': 
-            log.debug logMessage
+            if(logEnable)
+            {
+                log.debug logMessage
+            }
             break
         case 'warn':
             log.warn logMessage
@@ -1168,7 +1171,10 @@ def l(message, logPostfix = "", logLevel = debug)
             log.error logMessage
             break
         default:
-            log.info logMessage
+            if(txtEnable)
+            {
+                log.info logMessage
+            }
             break
     }
 }
