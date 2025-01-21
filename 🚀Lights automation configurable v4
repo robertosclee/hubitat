@@ -101,7 +101,7 @@ width: 100px; float: left; border-bottom: 1px dotted #000;
     if(appName) app.updateLabel(appName)
     input "appEnabled", "bool", title: "Enable app?", defaultValue: true, width: 4
     input "txtEnable", "bool", title: "Descriptive logging?", defaultValue: true, required: true, width: 4
-    input "logEnable", "bool", title: "Extensive logging?", required: true, width: 4
+    input "logEnable", "bool", title: "Extensive (debug) logging?", required: true, width: 4
 
     input "aboutRoom", "enum", title: "Select room", options: ["h", "lr", "mb", "g", "k", "s", "w", "o"], required: true, width: 6
     input "includedModes", "mode", title: "Applicable modes", multiple: true, required: false, width: 6

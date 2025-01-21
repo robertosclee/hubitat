@@ -10,7 +10,9 @@ definition(
 
 preferences {
     section("Settings") {
-        input "groupChanges", "bool", title: "Group changes with a slight delay? Otherwise notify on every change", required: true
+        input "groupChanges", "bool", title: "Group changes with a slight delay? Otherwise notify on every change", required: true, width: 4
+        input "txtEnable", "bool", title: "Descriptive logging?", defaultValue: true, required: true, width: 4
+        input "logEnable", "bool", title: "Extensive (debug) logging?", required: true, width: 4        
     }
     section("Select Devices to Monitor") {
         input "lights", "capability.switch", title: "Which lights?", multiple: true, required: false, width: 4
@@ -50,7 +52,12 @@ def logdebug(message, methodName ="")
     {
         state.logPostfix = methodName
     }
-    log.debug "[⚙️${state.logPrefix}] ${state.logPostfix} ➜ ${message}"
+
+    if(logEnable)
+    {
+        log.debug "[⚙️${state.logPrefix}] ${state.logPostfix} ➜ ${message}"
+    }
+    
 }
 
 def loginfo(message, methodName ="") 
@@ -59,7 +66,11 @@ def loginfo(message, methodName ="")
     {
         state.logPostfix = methodName
     }
-    log.info "[⚙️${state.logPrefix}] ${state.logPostfix} ➜ ${message}"
+
+    if(txtEnable)
+    {
+        log.info "[⚙️${state.logPrefix}] ${state.logPostfix} ➜ ${message}"
+    }
 }
 
 def installed() 
@@ -78,6 +89,8 @@ def initialize()
     state.logPrefix = "watcher"
     unsubscribe()
     
+    subscribe(location, "mode", modeChangeHandler)
+
     if (lights) {
         subscribe(lights, "switch", lightsChangeHandler)
     }
@@ -91,17 +104,29 @@ def initialize()
     {
         subscribe(manualCheckTrigger, "switch.on", manualCheckHandler)
     }
-    
-    subscribe(manualLightsOffTrigger, "switch", manualLightsOffTriggerHandler)
+    if(manualLightsOffTrigger)
+    {
+        subscribe(manualLightsOffTrigger, "switch", manualLightsOffTriggerHandler)
+    }
 
-    subscribe(location, "mode", modeChangeHandler)
-    
     //runIn(1, checkStateAndNotify, [data: [source: 'initialize']])
 
     // Schedule the check
-    runIn(1, schedulerCheck)    
+    runIn(3, schedulerCheck)    
     
-    loginfo("watcher engine restarted",callMethod)
+    if (sendMessageLog) 
+    {
+        sendMessageLog.each { device ->
+            if (device.hasCapability("Notification")) {
+                device.deviceNotification("watcher engine restarted")
+                loginfo("watcher engine restarted",callMethod)
+            }
+            else 
+            {
+                logwarn("Device ${device.displayName} does not support notifications.",callMethod)
+            }                     
+        }            
+    }
 }
 
 def modeChangeHandler(evt) 
@@ -215,24 +240,27 @@ def checkStateAndNotify(data)
     def motionActive = motionsensors ? motionsensors.findAll { it.currentMotion == "active" }.sort { a, b -> a.displayName <=> b.displayName } : []
 
     def message = "💡:${lightsOn.size()}/${lights.size()} 🚪:${openDoors.size()}/${doors.size()} 👋:${motionActive.size()}/${motionsensors.size()}"
+    loginfo(message, callMethod)
+
     //def messagedoors = "🚪:${openDoors.size()}"
     //def messagelights = "💡:${lightsOn.size()}"
     //def messagemotions = "👋:${motionNames.size()}"
+    def joinChars = " "
     if (lightsOn) 
     {
-        def lightNames = lightsOn.collect { it.displayName }.join("\n")
+        def lightNames = lightsOn.collect { it.displayName }.join(joinChars)
         message += "\n${lightNames}"
         //messagelights += "\n${lightNames}"
     }
     if (openDoors) 
     {
-        def doorNames = openDoors.collect { it.displayName }.join("\n")
+        def doorNames = openDoors.collect { it.displayName }.join(joinChars)
         message += "\n${doorNames}"
         //messagedoors += "\n${doorNames}"
     }
     if (motionActive && ["SleepAll", "Away"].contains(location.mode) ) 
     {
-        def motionNames = motionActive.collect { it.displayName }.join("\n")
+        def motionNames = motionActive.collect { it.displayName }.join(joinChars)
         message += "\n${motionNames}"
         //messagemotions += "\n${motionNames}"
     }    
