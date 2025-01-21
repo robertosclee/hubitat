@@ -418,11 +418,14 @@ def lightSwitchesHandler(evt)
     //DETERMINE IF LIGHTS ARE TURNED ON MANUALLY
     if(deviceStatus == "on" && enableManual)
     {
-        def thresholdDetermineIfAutomation = 1000
+        def thresholdDetermineIfAutomation = 1
         def elapsedTime = calculateSecondsBetweenDates(parseToDate(state.lastautomation), new Date())
+        ldebug("parseToDate(state.lastautomation) : ${parseToDate(state.lastautomation)}")
+        ldebug("new Date() : ${new Date()}")
+        ldebug("calculateSecondsBetweenDates(parseToDate(state.lastautomation), new Date()) : ${calculateSecondsBetweenDates(parseToDate(state.lastautomation), new Date())}")
         //ldebug("lastautomation: ${state.lastautomation} - now: ${nowDt()} elapsedTime: ${elapsedTime/(60*60)}, probably${  elapsedTime > thresholdDetermineIfAutomation ? " no " : " "  }automation")
 
-        ldebug("elapsedTime since last automation: ${elapsedTime/(60*60)}, likely ${  elapsedTime > thresholdDetermineIfAutomation ? "manually" : "automation"  }")
+        ldebug("elapsedTime since last automation: ${elapsedTime/(60*60)} (${state.lastautomation}), likely ${  elapsedTime > thresholdDetermineIfAutomation ? "manually" : "automation"  }")
 
         if(elapsedTime > thresholdDetermineIfAutomation)
         {
@@ -1599,6 +1602,7 @@ def parseToDate(dateString, format = "yyyy-MM-dd'T'HH:mm:ss.SSS") {
 
 def calculateSecondsBetweenDates(Date startDate, Date endDate) {
     // Calculate the difference in milliseconds
+    ldebug("startDate: ${endDate.time}, endDate: ${startDate.time}")
     def differenceInMillis = endDate.time - startDate.time
 
     // Convert milliseconds to seconds
