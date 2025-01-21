@@ -2,10 +2,10 @@ import groovy.json.JsonOutput
 
 #include RL.Utils
 definition(
-    name: "🚀Lights automation, living room",
+    name: "🚀Lights automation, hallway",
     namespace: "Roberto Lee",
     author: "RL",
-    description: "Turn lights on based on motion, lux, mode, and apply mode-specific brightness and color when lights are off. TV on, or dinner time applies",
+    description: "Turn lights on based on motion, lux, mode, and apply mode-specific brightness and color when lights are off. Doors status applies",
     category: "Convenience",
     iconUrl: "",
     iconX2Url: ""
@@ -27,8 +27,10 @@ preferences {
         }
         input "testIsDarkSwitch", "capability.switch", title: "Test IsDark Switch", required: false
         input "testIsDinnerTimeSwitch", "capability.switch", title: "Test IsDinnerTime Switch", required: false
+        input "testRoomDoors", "capability.contactSensor", title: "Test room doors", required: false, multiple: true
+        input "testHouseDoors", "capability.contactSensor", title: "Test house doors", required: false, multiple: true
+        input "testTurnOnButtons", "capability.pushableButton", title: "Which buttons?", required: false, multiple: true
         input "testMode", "mode", title: "TEST Mode", required: true
-        input "testTvSocketPlug", "capability.powerMeter", title: "Test TV socket plug, power in watts", required: true
     }    
     section("Select devices") {
         input "motionSensorsTurnOn", "capability.motionSensor", title: "Select motion sensors to turn on light(s)", required: true, multiple: true
@@ -40,11 +42,14 @@ preferences {
             input "${grpName}Switches", "capability.switchLevel", title: "Select ${gprDescription}", required: true, multiple: true
         }        
         input "isDarkSwitch", "capability.switch", title: "IsDark Switch", required: false
-        input "tvSocketPlug", "capability.powerMeter", title: "TV socket plug, power in watts", required: true
+        input "roomDoors", "capability.contactSensor", title: "Room doors", required: false, multiple: true
+        input "houseDoors", "capability.contactSensor", title: "House doors", required: false, multiple: true
+        input "turnOnButtons", "capability.pushableButton", title: "Which buttons turnon?", required: false, multiple: true
     }
     section("Configs") {
-        input "luxThreshold", "number", title: "Lux Threshold for turning on the lights", required: true, defaultValue: 50
-        input "tvPowerThreshold", "number", title: "TV power threshold for it to be considered on (watts)", required: true, defaultValue: 55
+        input "luxThreshold", "number", title: "Lux Threshold for turning on the lights", required: false, defaultValue: 50
+        input "stayOnHouseDoorsOpen", "number", title: "Stayon when house doors opens", required: true, defaultValue: 300
+        input "stayOnTurnOnButtons", "number", title: "Stayon when turnon buttons pushed", required: true, defaultValue: 300        
     }
     section("Select Mode(s) to Activate Turning On Light") {
         input "includedModes", "mode", title: "Modes to Include", multiple: true, required: false
@@ -53,12 +58,12 @@ preferences {
     section("Mode-specific settings ${includedModes}, TV mode and Dining time") {
         includedModes.each { mode ->
             paragraph "<br/><br/><H2>${mode.toUpperCase()}</H2>"  // Divider
-            input "stayon_${mode}", "number", title: "<b>${mode}</b> stay-on duration seconds", required: true, defaultValue: 30
             getLightsAndState().lightsArr.each { grp ->  // Loop through each row
                 getLightsAndState().statesArr.each { state ->
                     def nms = getLightsAndState(grp[0], state[0], mode)
                     paragraph "<b>${nms.title}</b>"
                     input "${nms.turnon}", "bool", title: "${nms.statedescription} turn light on?", required: false                
+                    input "${nms.stayon}", "number", title: "${nms.statedescription} stayon (0-100)", required: true, defaultValue: 30
                     input "${nms.brightness}", "number", title: "${nms.statedescription} brightness (0-100)", required: true, defaultValue: 88
                     input "${nms.color}", "color", title: "${nms.statedescription} color", required: false, defaultValue: "#ffffff"                    
                 }
@@ -71,12 +76,11 @@ def getLightsAndState(lightname = null, statename = null,modename = null) {
     def lightGroupArray = [
         ["mainlights", "Main lights"],
         ["sidelights", "Side lights"],
-        ["dinnerlights", "Dinner lights"],
     ] 
     def stateGroupArray = [
         ["", ""],
-        ["_tvon", "when TV is on"],
-        ["_dinnertime", "when it is dinner time"],
+        ["_roomdoorsopen", "when a room door is open"],
+        ["_housedoorsopen", "when a house door is open"],
     ]    
     def result = []  
     def defaultresult = [modesArr: includedModes,
@@ -111,7 +115,8 @@ def getLightsAndState(lightname = null, statename = null,modename = null) {
                                               statedescription: stateDescription,
                                               turnon: "turn_on_${mode}_${grpName}${stateName}", 
                                               brightness: "brightness_${mode}_${grpName}${stateName}", 
-                                              color: "color_${mode}_${grpName}${stateName}"
+                                              color: "color_${mode}_${grpName}${stateName}",
+                                              stayon: "stayon_${mode}_${grpName}${stateName}"
                                              ]     
                                     //logdebug "${n}"
                                     break outerMostLoop // Exits both loops
@@ -189,7 +194,8 @@ def initialize() {
     
     logdebug "getMainLights: ${getMainLights()}"
     logdebug "getSideLights: ${getSideLights()}"
-    logdebug "getDinnerLights: ${getDinnerLights()}"
+    logdebug "getRoomDoors: ${getRoomDoors()}"
+    logdebug "getHouseDoors: ${getHouseDoors()}"
     logdebug "getStayOn: ${getStayOn()}"
     logdebug "getTv: ${getTv()}"
     logdebug "getDinnerTime: ${getDinnerTime()}"
@@ -197,21 +203,18 @@ def initialize() {
     logdebug "getMode: ${getMode()}"
     
     def configs = getConfigs("mainlights")
-    logdebug "MAINLIGHTS, br: ${getConfigBrightness(configs)}, color: ${getConfigColor(configs)}, turnon: ${getDoTurnOn(configs)}"
+    logdebug "MAINLIGHTS, br: ${getConfigBrightness(configs)}, color: ${getConfigColor(configs)}, turnon: ${getDoTurnOn(configs)}, turnon: ${getStayOn(configs)}"
 
     configs = getConfigs("sidelights")
-    logdebug "SIDELIGHTS, br: ${getConfigBrightness(configs)}, color: ${getConfigColor(configs)}, turnon: ${getDoTurnOn(configs)}"
+    logdebug "SIDELIGHTS, br: ${getConfigBrightness(configs)}, color: ${getConfigColor(configs)}, turnon: ${getDoTurnOn(configs)}, turnon: ${getStayOn(configs)}"
     
     configs = getConfigs("dinnerlights")
-    logdebug "DINNERLIGHTS, br: ${getConfigBrightness(configs)}, color: ${getConfigColor(configs)}, turnon: ${getDoTurnOn(configs)}"
+    logdebug "DINNERLIGHTS, br: ${getConfigBrightness(configs)}, color: ${getConfigColor(configs)}, turnon: ${getDoTurnOn(configs)}, turnon: ${getStayOn(configs)}"
     /*
     logdebug "getConfigBrightness: ${getConfigBrightness(configs)}"
     logdebug "getConfigColor: ${getConfigColor(configs)}"
     logdebug "getDoTurnOn: ${getDoTurnOn(configs)}"
       */
-    
-
-    logdebug "getStayOn: ${getStayOn()}"
     
     
     getMotionSensorTurnOn().each { sensor ->
@@ -223,14 +226,21 @@ def initialize() {
         subscribe(sensor, "motion.inactive", motionStoppedKeepOnHandler)
     }    
     subscribe(getLuxSensor(), "illuminance", luxChangedHandler)  
-    subscribe(getTv(), "power", tvPowerChanged)
+    //subscribe(getTv(), "power", tvPowerChanged)
     
     subscribe(getIsDarkSwitch(), "switch.on", switchesHandler)
     subscribe(getIsDarkSwitch(), "switch.off", switchesHandler)
-    subscribe(getDinnerTime(), "switch.on", switchesHandler)
-    subscribe(getDinnerTime(), "switch.off", switchesHandler)    
-    
-        
+    //subscribe(getDinnerTime(), "switch.on", switchesHandler)
+    //subscribe(getDinnerTime(), "switch.off", switchesHandler)    
+            
+    subscribe(getRoomDoors(), "contact", roomDoorsHandler)
+    subscribe(getHouseDoors(), "contact", getHouseDoors)
+
+    subscribe(getTurnOnButtons(), "pushed", buttonTurnOnPushedHandler)
+    subscribe(getTurnOnButtons(), "doubleTapped", buttonTurnOnDoubleTappedHandler)
+    subscribe(getTurnOnButtons(), "held", buttonTurnOnHeldHandler)   
+
+
     subscribe(location, "mode", modeChangedHandler)
     subscribe(getMode(), "mode", modeChangedHandler)
     
@@ -238,6 +248,16 @@ def initialize() {
     
     unschedule(turnOffIfInactive)
 }
+
+
+
+
+
+
+
+
+
+
 
 
 //DEVICES
@@ -259,8 +279,14 @@ def getMainLights(){
 def getSideLights(){
      return doTest ? testSideLightSwitches : sideLightSwitches
 }
-def getDinnerLights(){
-     return doTest ? testDinnerLightSwitches : dinnerLightSwitches
+def getRoomDoors(){
+     return doTest ? testRoomDoors : roomDoors
+}
+def getHouseDoors(){
+     return doTest ? testHouseDoors : houseDoors
+}
+def getTurnOnButtons(){
+     return doTest ? testTurnOnButtons : turnOnButtons
 }
 def getTv(){
     return doTest ? testTvSocketPlug : tvSocketPlug
@@ -317,11 +343,12 @@ def getConfigColor(nms){
 def getDoTurnOn(nms){
     return settings["${nms.turnon}"]
 }
-
 def getStayOn(){
-    def stayon = settings["stayon_${getMode()}"]
-    return stayon < 1 || stayon == null ? 30 : stayon
+    //def stayon = settings["stayon_${getMode()}"]
+    //return stayon < 1 || stayon == null ? 30 : stayon
+    return settings["${nms.stayon}"]
 }
+
 
 //isDinnerTime()
 
@@ -393,6 +420,57 @@ def modeChangedHandler(evt) {
     // Reevaluate the brightness, color, and stay-on duration based on the new mode
     //ActionLights("modeChangedHandler", true)
 }
+
+
+def roomDoorsHandler(evt) {
+    logdebug "roomDoorsHandler: ${evt?.value}"
+    ActionLights("kids door change")
+    /*
+    //if (isDark.currentValue("switch") == "on" && (location.mode == "SleepAll" || location.mode == "SleepSome")) {
+    if (location.mode == "SleepAll" || location.mode == "SleepSome") {
+        logdebug "kids door event triggered in Sleep. Re-evaluating motion handler logic."
+        //motionHandler(null)
+        
+    }
+    */
+}
+
+def buttonTurnOnPushedHandler(evt) {
+    logdebug "buttonPushedHandler: ${evt.value}"
+    def mode = location.mode  
+    def isDarkOn = isDark.currentValue("switch") == "on"
+    def isKidsDoorOpen = kidsDoorSensor.currentValue("contact") == "open"
+    
+    if (debugMode)
+    {
+       isDarkOn = true;
+       isKidsDoorOpen = false;
+       mode = "SleepAll"
+    }    
+    
+    if (mode == "SleepAll" || mode == "SleepSome") {
+        if (isKidsDoorOpen) {
+            setLightLevelWithTimeout(hallwayLight, mode, settings.levelButtonPushedDimmed, settings.durationButtonPushed, turnOffHallwayLight, "button force", true)
+        } else {
+            setLightLevelWithTimeout(hallwayLight, mode, settings.levelButtonPushedFull, settings.durationButtonPushed, turnOffHallwayLight, "button force", true)
+        }
+        setBtnPressedFlag()
+    }else{
+        setLightLevelWithTimeout(hallwayLight, mode, settings.levelButtonPushedFull, settings.durationButtonPushed, turnOffHallwayLight, "button force", true)
+    }
+}
+
+def buttonTurnOnDoubleTappedHandler(evt) {
+    logdebug "buttonDoubleTappedHandler: ${evt.value}"
+    setLightLevelWithTimeout(hallwayLight, mode, settings.levelButtonPushedFull, settings.durationButtonPushed, turnOffHallwayLight, "button double force brightness", true)
+    setBtnPressedFlag()
+}
+
+def buttonTurnOnHeldHandler(evt) {
+    logdebug "buttonHeldHandler: ${evt.value}"
+    setBtnPressedFlag()
+}
+
 
 
 
