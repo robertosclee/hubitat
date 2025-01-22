@@ -87,7 +87,9 @@ def initialize()
 {
     def callMethod = "initialize"
     state.logPrefix = "watcher"
-    unsubscribe()
+
+    unschedule()
+	unsubscribe()
     
     subscribe(location, "mode", modeChangeHandler)
 
@@ -106,6 +108,7 @@ def initialize()
     }
     if(manualLightsOffTrigger)
     {
+        loginfo("subscribe ${manualLightsOffTrigger}",callMethod)
         subscribe(manualLightsOffTrigger, "switch", manualLightsOffTriggerHandler)
     }
 
@@ -139,7 +142,6 @@ def modeChangeHandler(evt)
         def excludePartialNames = ["kids"]
         turnOffLightsExcept(callMethod, excludePartialNames)
     }    
-
     if ( ["Away"].contains(location.mode) )
     {
         def excludePartialNames = []
@@ -151,16 +153,21 @@ def manualLightsOffTriggerHandler(evt)
 {
     def callMethod = "manualLightsOffTriggerHandler"
 
-    if (["SleepAll", "SleepSome"].contains(location.mode))
+    if(evt.value == "on")
     {
-        def excludePartialNames = ["kids"]
-        turnOffLightsExcept(callMethod, excludePartialNames)
-    }    
-    if (location.mode == "Away")
-    {
-        def excludePartialNames = []
-        turnOffLightsExcept(callMethod, excludePartialNames)
-    }  
+        logdebug("All lights off triggered: ${evt.device}",callMethod)
+        if (["SleepAll", "SleepSome"].contains(location.mode))
+        {
+            def excludePartialNames = ["kids"]
+            turnOffLightsExcept(callMethod, excludePartialNames)
+        }    
+        else
+        {
+            def excludePartialNames = []
+            turnOffLightsExcept(callMethod, excludePartialNames)        
+        }
+    }	
+
 }
 
 def appButtonHandler(buttonName) 
@@ -176,7 +183,10 @@ def appButtonHandler(buttonName)
 def manualCheckHandler(evt) 
 {
     def callMethod = "manualCheckHandler"
-    runIn(3, checkStateAndNotify, [data: [source: callMethod]])    
+    if(evt.value == "on")
+    {
+        runIn(3, checkStateAndNotify, [data: [source: callMethod]])    
+    }
 }
 
 def motionHandler(evt) 
@@ -360,11 +370,20 @@ def turnOffLightsExcept(triggerMethod, excludePartialNames = [])
     def lightsOnNames = lightsOn.collect { it.displayName }.join(", ")
     def exceptNames = excludePartialNames.size > 0 ? ", except ${excludePartialNames.collect { it }.join(", ")}" : ""
 
-    loginfo("Turning off ${lightsOn.size} of ${lights.size()} lights in house${exceptNames} #${triggerMethod}",callMethod) 
-    sendMessageLog.deviceNotification("Turning off ${lightsOn.size} of ${lights.size()} lights in house${exceptNames}\n${lightsOnNames}\n#watcher #${triggerMethod}")    
+    if (lightsOn.size() == 0) 
+    {
+        loginfo("No lights to turn off in house${exceptNames} #${triggerMethod}",callMethod)
+        sendImportant.deviceNotification("No lights to turn off in house${exceptNames}\n#watcher #${triggerMethod}")
+        return
+    }
+    else
+    {
+        loginfo("Turning off ${lightsOn.size} of ${lights.size()} lights in house${exceptNames} #${triggerMethod}",callMethod) 
+        sendImportant.deviceNotification("Turning off ${lightsOn.size} of ${lights.size()} lights in house${exceptNames}\n${lightsOnNames}\n#watcher #${triggerMethod}")    
+        lightsOn.each { light ->
+            logdebug("Turning off ${light.displayName}\n#${triggerMethod}",callMethod)
+            light.off() 
+        } 
+    }
     
-    lightsOn.each { light ->
-        logdebug("Turning off ${light.displayName}\n#${triggerMethod}",callMethod)
-        light.off() 
-    } 
 }
