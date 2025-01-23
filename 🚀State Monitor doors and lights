@@ -252,6 +252,12 @@ def checkStateAndNotify(data)
     def message = "💡:${lightsOn.size()}/${lights.size()} 🚪:${openDoors.size()}/${doors.size()} 👋:${motionActive.size()}/${motionsensors.size()}"
     loginfo(message, callMethod)
 
+/*
+    atomicState.each { key, value ->
+        logdebug("atomicState[${key}] = ${value}")
+    }    
+*/
+    //logdebug("<b>location.getVariable ${location.getVariable("turnofftime_40")}</b>")
     //def messagedoors = "🚪:${openDoors.size()}"
     //def messagelights = "💡:${lightsOn.size()}"
     //def messagemotions = "👋:${motionNames.size()}"
@@ -277,7 +283,7 @@ def checkStateAndNotify(data)
 
     if (message) {
         //message += " | watching total of ${lights.size()} lights, ${doors.size()} doors, ${motionsensors.size()} motion sensors\n"        
-		message += "\n#watcher #${source}"
+		message += "\n#watcher #${source} #${location.mode}"
         /*
         if (sendPush) 
         {

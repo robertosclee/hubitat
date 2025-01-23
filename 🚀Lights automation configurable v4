@@ -114,8 +114,14 @@ width: 100px; float: left; border-bottom: 1px dotted #000;
       
 
 
-def prefixInfo = "Room: <b>${aboutRoom}</b><br/>Mode: <b>${getMode()}</b>, Real: ${location.mode}, Modes: ${includedModes}<br/>Last motion: ${getFormatted(state.lastmotiondt)} by ${state.lastmotionby}"       
+def prefixInfo = "Room: <b>${aboutRoom}</b><br/>Mode: <b>${getMode()}</b>, Real: ${location.mode}, Modes: ${includedModes}"       
+if(state.lastmotiondt != null)
+{
+prefixInfo += "<br/>Last motion: ${getFormatted(state.lastmotiondt)} by ${state.lastmotionby}"
 prefixInfo += "<br/>Any motion: <b>${isAnyMotionActive(allMotionSensors())}</b>"
+}
+
+
 prefixInfo += "<br/>Any lights on: <b>${isAnySwitchOn(allLights())}</b>"
 if(isAnySwitchOn(allLights()))        
 {
@@ -199,6 +205,7 @@ section("DEVICES", hideable: true, hidden: false)
             	allstate += "<tr><td>${key}</td><td colspan='2'>${state[key]}</td></tr>"
             }
         }
+       
         allstate += "</table>";
         paragraph "<br/>All state:\n${allstate}"
     }
@@ -557,6 +564,15 @@ def motionStoppedReschedule(evt, m)
                 unschedule()
                 runIn(state.cfgStayon, checkMotionAndTurnOff)
                 state.turnofftime = addSecondsToNow(state.cfgStayon)
+                
+                /*
+                allLights().each { grp ->
+                    if(grp)
+                    {
+                        //location.setVariable("turnofftime_${grp.id}", state.turnofftime)
+                    }
+                } 
+                */               
                 linfo("motion stopped ${deviceName}, lights off in ${state.cfgStayon}s at ${  state.turnofftime }")
             }    
             else
@@ -575,8 +591,10 @@ void handleLightsBasedOnConfig(states, configs, lights)
     state.callMethod = "handleLightsBasedOnConfig"
     ldebug("<code style='background-color: yellow;'>${configs.base}</code>") //${configs.base.class}
     addConfigItem(configs.base)
+    ldebug("CONFIGS: ${configs.base}")
     if(configs.values && configs.values.do)
     {
+        linfo("CONFIGS: ${configs.values}")
         if( configs.values.turnon && configs.values.forcechange )
         {
             turnOnLights(states, configs, lights, comment = "ON FORCED ${configs.values}") 
@@ -768,6 +786,7 @@ void handleHallway(manual = "")
 
     if(states.isvalidmode)
     {
+        linfo("Hallway")
         if(false)
         {
         
@@ -1619,7 +1638,7 @@ def retrieveDate(key, format = "yyyy-MM-dd'T'HH:mm:ss.SSS")
 
 def retrieveDt(input, format = "yyyy-MM-dd'T'HH:mm:ss.SSS") 
 {
-    state.callMethod = "retrieveDate"
+    state.callMethod = "retrieveDt"
     if (input) {
         try {
             def parsedDate = Date.parse(format, input)
