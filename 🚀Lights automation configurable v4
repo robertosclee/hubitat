@@ -24,7 +24,6 @@ Map mainPage() {
     //state.remove("configHistory")        
     //state.remove("usedConfigHistory")  
 
-
 section("BASIC SETTINGS", hideable: true, hidden: true) 
 {
 paragraph """<style>
@@ -103,7 +102,7 @@ width: 100px; float: left; border-bottom: 1px dotted #000;
     input "txtEnable", "bool", title: "Descriptive logging?", defaultValue: true, required: true, width: 4
     input "logEnable", "bool", title: "Extensive (debug) logging?", required: true, width: 4
 
-    input "aboutRoom", "enum", title: "Select room", options: ["h", "lr", "mb", "g", "k", "s", "w", "o"], required: true, width: 6
+    input "aboutRoom", "enum", title: "Select room", options: ["h", "lr", "mb", "g", "k", "s", "w", "o", "d"], required: true, width: 6
     input "includedModes", "mode", title: "Applicable modes", multiple: true, required: false, width: 6
     input "sendMessage", "capability.notification", title: "Send to custom notification device (optional)", multiple: false, required: false, width: 6
     input "sendMessageImportant", "capability.notification", title: "Send to important notification device (optional)", multiple: false, required: false, width: 6
@@ -115,8 +114,14 @@ width: 100px; float: left; border-bottom: 1px dotted #000;
       
 
 
-def prefixInfo = "Room: <b>${aboutRoom}</b><br/>Mode: <b>${getMode()}</b>, Real: ${location.mode}, Modes: ${includedModes}<br/>Last motion: ${getFormatted(state.lastmotiondt)} by ${state.lastmotionby}"       
+def prefixInfo = "Room: <b>${aboutRoom}</b><br/>Mode: <b>${getMode()}</b>, Real: ${location.mode}, Modes: ${includedModes}"       
+if(state.lastmotiondt != null)
+{
+prefixInfo += "<br/>Last motion: ${getFormatted(state.lastmotiondt)} by ${state.lastmotionby}"
 prefixInfo += "<br/>Any motion: <b>${isAnyMotionActive(allMotionSensors())}</b>"
+}
+
+
 prefixInfo += "<br/>Any lights on: <b>${isAnySwitchOn(allLights())}</b>"
 if(isAnySwitchOn(allLights()))        
 {
@@ -200,6 +205,7 @@ section("DEVICES", hideable: true, hidden: false)
             	allstate += "<tr><td>${key}</td><td colspan='2'>${state[key]}</td></tr>"
             }
         }
+       
         allstate += "</table>";
         paragraph "<br/>All state:\n${allstate}"
     }
@@ -510,7 +516,6 @@ def motionDetectedTurnOnHandler(evt)
     {
         roomsHandler()
     }
-    
 }
 
 def motionDetectedKeepOnHandler(evt)
@@ -555,13 +560,22 @@ def motionStoppedReschedule(evt, m)
     //TEST IF LIGHTS ARE ON?
     if(isAnySwitchOn(allLights()))
     {
-        if ( ["h","lr","mb","k", "g", "o"].contains(aboutRoom) ) //ROOMS WITH MOTION SENSORS
+        if ( ["h","lr","mb","k", "g", "o", "d"].contains(aboutRoom) ) //ROOMS WITH MOTION SENSORS
         {
             if(state.cfgStayon > 0 && state.cfgStayon != null )
             {
                 unschedule()
                 runIn(state.cfgStayon, checkMotionAndTurnOff)
                 state.turnofftime = addSecondsToNow(state.cfgStayon)
+                
+                /*
+                allLights().each { grp ->
+                    if(grp)
+                    {
+                        //location.setVariable("turnofftime_${grp.id}", state.turnofftime)
+                    }
+                } 
+                */               
                 linfo("motion stopped ${deviceName}, lights off in ${state.cfgStayon}s at ${  state.turnofftime }")
             }    
             else
@@ -580,8 +594,10 @@ void handleLightsBasedOnConfig(states, configs, lights)
     state.callMethod = "handleLightsBasedOnConfig"
     ldebug("<code style='background-color: yellow;'>${configs.base}</code>") //${configs.base.class}
     addConfigItem(configs.base)
+    ldebug("CONFIGS: ${configs.base}")
     if(configs.values && configs.values.do)
     {
+        linfo("CONFIGS: ${configs.values}")
         if( configs.values.turnon && configs.values.forcechange )
         {
             turnOnLights(states, configs, lights, comment = "ON FORCED ${configs.values}") 
@@ -701,12 +717,11 @@ def checkMotionAndTurnOff()
     ldebug(" [SleepAll, SleepSome, SleepSomeEarlyWorkday].contains(currentMode) : ${["SleepAll", "SleepSome", "SleepSomeEarlyWorkday"].contains(currentMode)}")
     ldebug("state.turnedonmanually : ${state.turnedonmanually } and isAnyMotionActive(motionSensorsTurnOn) : ${isAnyMotionActive(motionSensorsTurnOn)}")
     
-    if( 
-                ["mb"].contains(aboutRoom)
-                && ["SleepAll", "SleepSome", "SleepSomeEarlyWorkday"].contains(currentMode) 
-                && !state.turnedonmanually 
-                && !isAnyMotionActive(motionSensorsTurnOn)
-                )
+    if( ["mb"].contains(aboutRoom)
+        && ["SleepAll", "SleepSome", "SleepSomeEarlyWorkday"].contains(currentMode) 
+        && !state.turnedonmanually 
+        && !isAnyMotionActive(motionSensorsTurnOn)
+        )
     {
         state.callMethod = "checkMotionAndTurnOff"
         unschedule()
@@ -746,7 +761,7 @@ def roomsHandler()
     else if(aboutRoom == "mb"){ handleMasterBedroom() }
     else if(aboutRoom == "lr"){ handleLivingRoom() }
     else if(aboutRoom == "o"){ handleOffice() }
-    else if ( ["g", "k"].contains(aboutRoom) ) { handleSimpleMotion() }
+    else if ( ["g", "k", "d"].contains(aboutRoom) ) { handleSimpleMotion() }
     else if ( ["w", "s"].contains(aboutRoom) ) { handleSimpleDoor() }    
 }
 
@@ -774,6 +789,7 @@ void handleHallway(manual = "")
 
     if(states.isvalidmode)
     {
+        linfo("Hallway")
         if(false)
         {
         
@@ -1054,11 +1070,6 @@ void handleSimpleDoor(manual = "") //CONTACT ON OR OFF
     }
 }
 //HANDLE ROOM END
-
-
-
-
-
 
 
 
@@ -1631,7 +1642,7 @@ def retrieveDate(key, format = "yyyy-MM-dd'T'HH:mm:ss.SSS")
 
 def retrieveDt(input, format = "yyyy-MM-dd'T'HH:mm:ss.SSS") 
 {
-    state.callMethod = "retrieveDate"
+    state.callMethod = "retrieveDt"
     if (input) {
         try {
             def parsedDate = Date.parse(format, input)
