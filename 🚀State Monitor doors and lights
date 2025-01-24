@@ -281,7 +281,8 @@ def checkStateAndNotify(data)
         //messagemotions += "\n${motionNames}"
     }    
 
-    if (message) {
+    if (message) 
+    {
         //message += " | watching total of ${lights.size()} lights, ${doors.size()} doors, ${motionsensors.size()} motion sensors\n"        
 		message += "\n#watcher #${source} #${location.mode}"
         /*
@@ -298,23 +299,7 @@ def checkStateAndNotify(data)
 
         
         def urgentText = ""
-
-        if (sendMessageLog) 
-        {
-            //log.debug "sendMessageLog"
-            //sendMessageLog.deviceNotification(message)
-            sendMessageLog.each { device ->
-                if (device.hasCapability("Notification")) {
-                    device.deviceNotification("${message}")
-                    logdebug("log: ${urgentText}${message}",callMethod)
-                }
-                else 
-                {
-                    logwarn("Device ${device.displayName} does not support notifications.",callMethod)
-                }                     
-            }            
-        }
-
+        def doLog = false
 
         if (sendImportant) 
         {
@@ -340,7 +325,9 @@ def checkStateAndNotify(data)
                 urgentText = "\nMODE: ${location.mode.toUpperCase()}, BUT"
             }   
 
-            if (doNotifyImportant) {
+            if (doNotifyImportant) 
+            {
+                doLog = true
                 state.somethingwasonoropen = false
                 sendImportant.each { device ->
                     if (device.hasCapability("Notification")) 
@@ -359,6 +346,25 @@ def checkStateAndNotify(data)
             state.somethingwasonoropen = (lightsOn.size() > 0 || openDoors.size() > 0)                    
         }
         
+        if (sendMessageLog || doLog) 
+        {
+            //log.debug "sendMessageLog"
+            //sendMessageLog.deviceNotification(message)
+            sendMessageLog.each { device ->
+                if (device.hasCapability("Notification")) {
+                    device.deviceNotification("${urgentText}${message}")
+                    logdebug("log: ${urgentText}${message}",callMethod)
+                }
+                else 
+                {
+                    logwarn("Device ${device.displayName} does not support notifications.",callMethod)
+                }                     
+            }            
+        }
+
+
+
+
     }  else {
         loginfo("No lights on or doors open.",callMethod)
     }
@@ -380,12 +386,14 @@ def turnOffLightsExcept(triggerMethod, excludePartialNames = [])
     {
         loginfo("No lights to turn off in house${exceptNames} #${triggerMethod}",callMethod)
         sendImportant.deviceNotification("No lights to turn off in house${exceptNames}\n#watcher #${triggerMethod}")
+        sendMessageLog.deviceNotification("No lights to turn off in house${exceptNames}\n#watcher #${triggerMethod}")
         return
     }
     else
     {
         loginfo("Turning off ${lightsOn.size} of ${lights.size()} lights in house${exceptNames} #${triggerMethod}",callMethod) 
         sendImportant.deviceNotification("Turning off ${lightsOn.size} of ${lights.size()} lights in house${exceptNames}\n${lightsOnNames}\n#watcher #${triggerMethod}")    
+        sendMessageLog.deviceNotification("Turning off ${lightsOn.size} of ${lights.size()} lights in house${exceptNames}\n${lightsOnNames}\n#watcher #${triggerMethod}")
         lightsOn.each { light ->
             logdebug("Turning off ${light.displayName}\n#${triggerMethod}",callMethod)
             light.off() 

@@ -90,10 +90,19 @@ button.submitOnChange
 padding: 0 5px;
 }
 
-
 div.statename
 {
 width: 100px; float: left; border-bottom: 1px dotted #000;
+}
+
+.yellow
+{
+background-color: yellow;
+}
+
+.grey
+{
+background-color: grey;
 }
 </style>"""       
     input "appName", "text", title: "Name", submitOnChange: true
@@ -110,12 +119,9 @@ width: 100px; float: left; border-bottom: 1px dotted #000;
     input "enableManual", "bool", title: "Allow manually override. After turning on lights. No automation active until lights are turned off.", defaultValue: true, width: 8 
     input name: "Save", type: "button", title: "Save", submitOnChange: true    
 }
-   
-      
 
-
-def prefixInfo = "Room: <b>${aboutRoom}</b><br/>Mode: <b>${getMode()}</b>, Real: ${location.mode}, Modes: ${includedModes}"       
-if(state.lastmotiondt != null)
+def prefixInfo = "Room: <b>${aboutRoom}</b>, Mode: <b>${getMode()}</b>, Real: ${location.mode}, ${includedModes.size()} modes: ${includedModes} "       
+if(allMotionSensors())
 {
 prefixInfo += "<br/>Last motion: ${getFormatted(state.lastmotiondt)} by ${state.lastmotionby}"
 prefixInfo += "<br/>Any motion: <b>${isAnyMotionActive(allMotionSensors())}</b>"
@@ -137,34 +143,34 @@ section("DEVICES", hideable: true, hidden: false)
     lightGroupArray().each { grp ->
         statesDevices = ""
         grp.devices.each{d -> statesDevices += "${d.latestState("switch")?.date.format(dtFormat)} (${humanizeDatetime(d.latestState("switch")?.date)}) "}
-        input "${grp.id}", "capability.switchLevel", title: "${grp.description} <br/>${isAnySwitchOn(grp.devices) ? '<span style="background-color: yellow;"><b>on</b>' : '<span><b>off</b>'} since ${statesDevices} </span>", required: false, multiple: true, width: 6
+        input "${grp.id}", "capability.switchLevel", title: "${grp.description} <br/>${isAnySwitchOn(grp.devices) ? '<span class="yellow"><b>on</b>' : '<span><b>off</b>'} since ${statesDevices}, ${grp.devices.collect { it.currentValue("level") + "%" }.join(", ")}</span>", required: false, multiple: true, width: 6
         //paragraph "${ humanizeDatetime(getLatestStatesSortedByTime(grp[2], "switch").time) }"
     }    
 
     statesDevices = ""
     motionSensorsTurnOn.each{d -> statesDevices += "${d.latestState("motion")?.date.format(dtFormat)} (${humanizeDatetime(d.latestState("motion")?.date)}) "}
-    input "motionSensorsTurnOn", "capability.motionSensor", title: "'Turn on' motion sensors<br/>${isAnyMotionActive(motionSensorsTurnOn) ? '<span style="background-color: yellow;"><b>active</b>' : '<span><b>inactive</b>'} since ${statesDevices}</span>", required: false, multiple: true, width: 6
+    input "motionSensorsTurnOn", "capability.motionSensor", title: "'Turn on' motion sensors<br/>${isAnyMotionActive(motionSensorsTurnOn) ? '<span class="yellow"><b>active</b>' : '<span><b>inactive</b>'} since ${statesDevices}</span>", required: false, multiple: true, width: 6
     
     statesDevices = ""
     motionSensorsKeepOn.each{d -> statesDevices += "${d.latestState("motion")?.date.format(dtFormat)} (${humanizeDatetime(d.latestState("motion")?.date)}) "}
-    input "motionSensorsKeepOn", "capability.motionSensor", title: "'Keep on' motion sensors<br/>${isAnyMotionActive(motionSensorsKeepOn) ? '<span style="background-color: yellow;"><b>active</b>' : '<span><b>inactive</b>'} since ${statesDevices}</span>", required: false, multiple: true, width: 6
+    input "motionSensorsKeepOn", "capability.motionSensor", title: "'Keep on' motion sensors<br/>${isAnyMotionActive(motionSensorsKeepOn) ? '<span class="yellow"><b>active</b>' : '<span><b>inactive</b>'} since ${statesDevices}</span>", required: false, multiple: true, width: 6
 
     statesDevices = ""
     roomDoors.each{d -> statesDevices += "${d.latestState("contact")?.date.format(dtFormat)} (${humanizeDatetime(d.latestState("contact")?.date)}) "}
-    input "roomDoors", "capability.contactSensor", title: "Room doors<br/>${isAnyContactOpen(roomDoors) ? '<span style="background-color: yellow;"><b>open</b>' : '<span><b>closed</b>'} since ${statesDevices}</span>", required: false, multiple: true, width: 6
+    input "roomDoors", "capability.contactSensor", title: "Room doors<br/>${isAnyContactOpen(roomDoors) ? '<span class="yellow"><b>open</b>' : '<span><b>closed</b>'} since ${statesDevices}</span>", required: false, multiple: true, width: 6
     
     statesDevices = ""
     houseDoors.each{d -> statesDevices += "${d.latestState("contact")?.date.format(dtFormat)} (${humanizeDatetime(d.latestState("contact")?.date)}) "}    
-    input "houseDoors", "capability.contactSensor", title: "House doors<br/>${isAnyContactOpen(houseDoors) ? '<span style="background-color: yellow;"><b>open</b>' : '<span><b>closed</b>'} since ${statesDevices}</span>", required: false, multiple: true, width: 6    
+    input "houseDoors", "capability.contactSensor", title: "House doors<br/>${isAnyContactOpen(houseDoors) ? '<span class="yellow"><b>open</b>' : '<span><b>closed</b>'} since ${statesDevices}</span>", required: false, multiple: true, width: 6    
 
     def isConsideredDark = isSwitchOn(isDarkSwitch) || luxSensor?.currentIlluminance < luxThreshold 
     statesDevices = ""
     statesDevices += "switch <b>${boolToYesNo(isSwitchOn(isDarkSwitch))}</b>, low illum. <b>${boolToYesNo(luxSensor?.currentIlluminance < luxThreshold)}</b>"
-    paragraph "Is dark? ${isConsideredDark ? '<span style="background-color: yellow;"><b>yes</b>' : '<span><b>no</b>'}</span><br/>${statesDevices}", width: 3
+    paragraph "Is dark? ${isConsideredDark ? '<span class="yellow"><b>yes</b>' : '<span><b>no</b>'}</span><br/>${statesDevices}", width: 3
     
     statesDevices = ""
 	statesDevices += "${isDarkSwitch?.latestState("switch")?.date?.format(dtFormat)} (${humanizeDatetime(isDarkSwitch?.latestState("switch")?.date)}) "
-    input "isDarkSwitch", "capability.switch", title: "IsDark Switch<br/>${isSwitchOn(isDarkSwitch) ? '<span style="background-color: yellow;"><b>on</b>' : '<span><b>off</b>'} since ${statesDevices} </span>", required: false, width: 3
+    input "isDarkSwitch", "capability.switch", title: "IsDark Switch<br/>${isSwitchOn(isDarkSwitch) ? '<span class="yellow"><b>on</b>' : '<span><b>off</b>'} since ${statesDevices}</span>", required: false, width: 3
     
     statesDevices = ""
 	statesDevices += "${luxSensor?.latestState("illuminance")?.date?.format(dtFormat)} (${humanizeDatetime(luxSensor?.latestState("illuminance")?.date)}) "    
@@ -216,12 +222,10 @@ section("DEVICES", hideable: true, hidden: false)
         input "Save", "button", title: "Save", submitOnChange: true, width: 2
         input "copyButton", "button", title: "Copy Configurations", submitOnChange: true, width: 2
         input "deleteButton", "button", title: "Delete target Configurations", submitOnChange: true, width: 2
-        
     }         
 
-includedModes.each { mode ->
-        
-        section(mode == getMode() ? "<b>Mode: ${mode}</b>" : "Mode: ${mode}", hideable: true, hidden:  mode == getMode() ? false : true) 
+    includedModes.each { mode ->
+        section(mode == getMode() ? "<b>Mode: ${mode}</b>" : "Mode: ${mode}", class: "grey", hideable: true, hidden:  mode == getMode() ? false : false) 
         {
 			paragraph "${prefixInfo}"
             
@@ -231,7 +235,7 @@ includedModes.each { mode ->
                     def devicesRelatedToGrp = "<span>"+grp.description+"</span>"
                     if(isAnySwitchOn(grp.devices))
                     {
-                        devicesRelatedToGrp = "<span style='background-color: yellow'>"+grp.description+"</span>"
+                        devicesRelatedToGrp = "<span class='yellow'>${grp.description} = ${grp.devices.collect { it.currentValue("level") + "%" }.join(", ")}</span>"
                     }
                     
                     
@@ -244,7 +248,7 @@ includedModes.each { mode ->
                             def nms = getConfig(mode, grp.id, s.id)
                             if(s.devices)
                             {
-                                input "${nms.do}", "bool", title: "<div class='statename'>${boolToIcon(s.matchnow)} ${nms.statedescription} ${boolToArrowIcon(states.isRoomState == s.id)}</div> ${nms.values.do ? boolToOnOff(nms.values.turnon) : ""} ${nms.values.forcechange ? " for ${nms.values.stayon}s at ${nms.values.brightness}%" : ""}  ", required: false, defaultValue: false, width: 12
+                                input "${nms.do}", "bool", title: "<div class='statename ${states.isRoomState == s.id ? "yellow" : ""}'>${boolToIcon(s.matchnow)} ${nms.statedescription} ${boolToArrowIcon(states.isRoomState == s.id)}</div> ${nms.values.do ? boolToOnOff(nms.values.turnon) : ""} ${nms.values.forcechange ? " for ${nms.values.stayon}s at ${nms.values.brightness}%" : ""}  ", required: false, defaultValue: false, width: 12
                             }
 							
                         }                
@@ -266,7 +270,7 @@ includedModes.each { mode ->
                     def devicesRelatedToGrp = "<span>"+grp.description+"</span>"
                     if(isAnySwitchOn(grp.devices))
                     {
-                        devicesRelatedToGrp = "<span style='background-color: yellow'>${grp.description}</span>"
+                        devicesRelatedToGrp = "<span class='yellow'>${grp.description} = ${grp.devices.collect { it.currentValue("level") + "%" }.join(", ")}</span>"
                     }
                     paragraph "<u>${devicesRelatedToGrp}</u><br/>"
                     
@@ -275,14 +279,14 @@ includedModes.each { mode ->
 
                         if(nms.values.do)
                         {
-                            paragraph "<b>${boolToIcon(s.matchnow)} ${nms.title}</b> ${boolToArrowIcon(states.isRoomState == s.id)}", width: 2
-                            input "${nms.turnon}", "bool", title: "turn on? <code class='ninja' style='background-color: yellow'>${nms.turnon}</code>", required: false, defaultValue: false, width: 2
+                            paragraph "<b class='${states.isRoomState == s.id ? "yellow" : ""}'>${boolToIcon(s.matchnow)} ${nms.title} ${boolToArrowIcon(states.isRoomState == s.id)}</b>", width: 2
+                            input "${nms.turnon}", "bool", title: "turn on? <code class='ninja yellow'>${nms.turnon}</code>", required: false, defaultValue: false, width: 2
                             if(nms.values.turnon)
                             {
-                                input "${nms.forcechange}", "bool", title: "force settings? <code class='ninja' style='background-color: yellow'>${nms.forcechange}</code>", required: false, defaultValue: false, width: 2
-                                input "${nms.stayon}", "number", title: "stay on in seconds <code class='ninja' style='background-color: yellow'>${nms.stayon}</code>", required: true, defaultValue: 30, width: 2
-                                input "${nms.brightness}", "number", title: "brightness (0-100) <code class='ninja' style='background-color: yellow'>${nms.brightness}</code>", required: true, defaultValue: 88, width: 2
-                                input "${nms.color}", "color", title: "color <code class='ninja' style='background-color: yellow'>${nms.color}</code>", required: false, defaultValue: "#ffffff", width: 1
+                                input "${nms.forcechange}", "bool", title: "force settings? <code class='ninja yellow'>${nms.forcechange}</code>", required: false, defaultValue: false, width: 2
+                                input "${nms.stayon}", "number", title: "stay on in seconds <code class='ninja yellow'>${nms.stayon}</code>", required: true, defaultValue: 30, width: 2
+                                input "${nms.brightness}", "number", title: "brightness (0-100) <code class='ninja yellow'>${nms.brightness}</code>", required: true, defaultValue: 88, width: 2
+                                input "${nms.color}", "color", title: "color <code class='ninja yellow'>${nms.color}</code>", required: false, defaultValue: "#ffffff", width: 1
                             }
 
                             input name: "Save", type: "button", title: "Save", submitOnChange: true, width: 1   
@@ -297,7 +301,6 @@ includedModes.each { mode ->
             }
             
         }
-        
     } 
         
 
@@ -424,14 +427,11 @@ def lightSwitchesHandler(evt)
     //DETERMINE IF LIGHTS ARE TURNED ON MANUALLY
     if(deviceStatus == "on" && enableManual)
     {
-        def thresholdDetermineIfAutomation = 1
+        def thresholdDetermineIfAutomation = 1000
         def elapsedTime = calculateSecondsBetweenDates(parseToDate(state.lastautomation), new Date())
-        ldebug("parseToDate(state.lastautomation) : ${parseToDate(state.lastautomation)}")
-        ldebug("new Date() : ${new Date()}")
-        ldebug("calculateSecondsBetweenDates(parseToDate(state.lastautomation), new Date()) : ${calculateSecondsBetweenDates(parseToDate(state.lastautomation), new Date())}")
         //ldebug("lastautomation: ${state.lastautomation} - now: ${nowDt()} elapsedTime: ${elapsedTime/(60*60)}, probably${  elapsedTime > thresholdDetermineIfAutomation ? " no " : " "  }automation")
 
-        ldebug("elapsedTime since last automation: ${elapsedTime/(60*60)} (${state.lastautomation}), likely ${  elapsedTime > thresholdDetermineIfAutomation ? "manually" : "automation"  }")
+        ldebug("elapsedTime since last automation: ${elapsedTime/(60*60)}, likely ${  elapsedTime > thresholdDetermineIfAutomation ? "manually" : "automation"  }")
 
         if(elapsedTime > thresholdDetermineIfAutomation)
         {
@@ -451,6 +451,7 @@ def lightSwitchesHandler(evt)
 def modeChangedHandler(evt) 
 {
     state.callMethod = "modeChangedHandler"
+    state.modeJustChanged = true
     def newMode = evt.value
     linfo("Mode changed to ${newMode}")
     if(getMode() != newMode)
@@ -592,7 +593,7 @@ def motionStoppedReschedule(evt, m)
 void handleLightsBasedOnConfig(states, configs, lights)
 {
     state.callMethod = "handleLightsBasedOnConfig"
-    ldebug("<code style='background-color: yellow;'>${configs.base}</code>") //${configs.base.class}
+    ldebug("<code class='yellow'>${configs.base}</code>") //${configs.base.class}
     addConfigItem(configs.base)
     ldebug("CONFIGS: ${configs.base}")
     if(configs.values && configs.values.do)
@@ -625,8 +626,9 @@ void turnOnLights(states, configs, lights, comment = "")
     if(appEnabled)
     {
         lights.each { light ->
-                if(configs.values.forcechange || !isAnySwitchOn(allLights()))
+                if( (configs.values.turnon && configs.values.forcechange) || (configs.values.turnon && state.modeJustChanged) ) //|| !isAnySwitchOn(allLights())
                 {
+                    state.modeJustChanged = false
                     if(isColorDevice(light))
                     {
                         def hsl = hexToHSL(configs.values.color)
@@ -639,16 +641,17 @@ void turnOnLights(states, configs, lights, comment = "")
                         linfo ("TURN ON, FIXED LEVEL ${light.displayName}: ${configs.values.brightness}%")
                     }
                 }
+                else if( configs.values.turnon && !configs.values.forcechange)
+                {
+                    light.on()
+                    linfo("TURN ON ONLY, NO CHANGE SETTING ${light.displayName} [${configs.do}], ${comment}")
+                }                
                 else if( !configs.values.turnon )
                 {
                     light.off()
                     linfo("TURN OFF ${light.displayName} [${configs.turnon}], ${comment}")
                 }
-                else
-                {
-                    light.on()
-                    linfo("TURN ON, NO CHANGE SETTING ${light.displayName} [${configs.do}], ${comment}")
-                }
+
 
                 //logdebug "[${allStates().collect { "${it.key} : ${it.value}" }.join("] [")}]"
                 //loginfo "ON ${light.displayName} [${light.collect { "${it.key} : ${it.value}" }.join("] [")}]"        
@@ -1613,7 +1616,6 @@ def parseToDate(dateString, format = "yyyy-MM-dd'T'HH:mm:ss.SSS") {
 
 def calculateSecondsBetweenDates(Date startDate, Date endDate) {
     // Calculate the difference in milliseconds
-    ldebug("startDate: ${endDate.time}, endDate: ${startDate.time}")
     def differenceInMillis = endDate.time - startDate.time
 
     // Convert milliseconds to seconds

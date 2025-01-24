@@ -1,3 +1,5 @@
+import java.text.SimpleDateFormat
+
 definition(
     name: "🚀Light Gradual Dim and Off",
     namespace: "RL",
@@ -42,6 +44,29 @@ def initialize() {
     if(light)
     {
         subscribe(light, "switch.off", lightSwitchedOffHandler)
+        subscribe(light, "switch.on", lightSwitchedOnHandler)
+    }    
+}
+
+def lightSwitchedOnHandler(evt)
+{
+    def device = evt.device // The device that triggered the event
+    def deviceName = device.displayName // Get the name of the light
+    def deviceStatus = evt.value // Get the value (should be "off" in this case)
+
+    unschedule() // Cancel any ongoing dimming process
+
+    def timeRanges = [
+        [start: "19:00", end: "20:00"],
+        [start: "12:00", end: "13:00"]
+    ]
+
+    if (isNowWithinTimeRanges(timeRanges)) 
+    {
+        log.debug "${device.displayName} turned on within the specified time ranges. Running routine."
+        routineHandler(evt) // Start the routine
+    } else {
+        log.debug "${device.displayName} turned on the specified ranges. Do nothing."
     }    
 }
 
@@ -132,4 +157,29 @@ def roundUp(decimal) {
 
 def roundToNearest(decimal) {
     return Math.round(decimal) as int
+}
+
+
+
+
+
+def isNowWithinTimeRanges(timeRanges) {
+    def nowTime = new Date()
+    
+    // Loop through each time range
+    timeRanges.any { range ->
+        def startTime = timeToday(range.start, location.timeZone) // Start time for today
+        def endTime = timeToday(range.end, location.timeZone)     // End time for today
+
+        // Handle overnight ranges (end time before start time)
+        if (endTime.before(startTime)) {
+            // Shift the end time to the next day
+            endTime = endTime + 1
+        }
+
+        //log.debug "Tomorrow: ${endTime + 1}"
+
+        // Check if now is within the range
+        return nowTime >= startTime && nowTime <= endTime
+    }
 }
