@@ -1752,16 +1752,19 @@ String boolToOnOff(value = false)
     if(value) return value ? "on" : "off"
     return "off"
 }
+
 String boolToYesNo(value = false) 
 {
     if(value) return value ? "yes" : "no"
     return "no"
 }
+
 String boolToIcon(value = false) 
 {
     if(value) return value ? "&#10003;" : "&#10007;"
     return "&#10007;"
 }
+
 String boolToArrowIcon(value = false) 
 {
     if(value) return value ? "&#10140;" : ""
