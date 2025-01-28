@@ -333,7 +333,10 @@ def initialize()
     if(turnOnButtons)
     {
         ldebug("subscribing ${turnOnButtons}")
-        subscribe(sensor, "pushed", deviceHandler)
+        subscribe(sensor, "pushed", triggerLightsOnHandler)
+        subscribe(sensor, "doubleTapped", triggerLightsOnHandler)
+        subscribe(sensor, "held", triggerLightsOnHandler)
+        
         subscribe(turnOnButtons, "pushed", buttonTurnOnPushedHandler)
         subscribe(turnOnButtons, "doubleTapped", buttonTurnOnDoubleTappedHandler)
         subscribe(turnOnButtons, "held", buttonTurnOnHeldHandler)
@@ -351,7 +354,7 @@ def initialize()
     {
         motionSensorsTurnOn.each { sensor ->
             ldebug("subscribing ${sensor}")
-            subscribe(sensor, "motion.active", deviceHandler)            
+            subscribe(sensor, "motion.active", triggerLightsOnHandler)            
             subscribe(sensor, "motion.active", motionDetectedTurnOnHandler)
             subscribe(sensor, "motion.inactive", motionStoppedTurnOnHandler)
         }
@@ -412,9 +415,9 @@ def lightSwitchesHandler(evt) //WHEN LIGHTS TURNED ON BY AUTOMATION OR MANUALLY
     state.turnedonmanually = false
 }
 
-def deviceHandler(evt) 
+def triggerLightsOnHandler(evt) 
 {
-    state.callMethod = "deviceHandler"
+    state.callMethod = "triggerLightsOnHandler"
     def device = evt.device
     def deviceName = device.displayName
     def deviceStatus = evt.value
@@ -422,20 +425,6 @@ def deviceHandler(evt)
     
     state.lastautomation = nowDt()
     ldebug("lastautomation: ${state.lastautomation}")       
-    
-
-
-
-
-    if (evt?.physical) {
-        log.debug "Device was physically interacted with"
-        // Handle manual override or other actions
-    } else {
-        log.debug "Device was triggered digitally"
-        // Handle automation actions
-    }
-
-    ldebug("${deviceName} to <b>${deviceStatus}</b> and physical: ${evt?.physical} and class: ${deviceClass}")
 }
 
 def modeChangedHandler(evt) 

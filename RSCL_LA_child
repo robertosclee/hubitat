@@ -1,0 +1,32 @@
+definition(
+    name: "RSCL_LA_child",
+    namespace: "RSCL_LA",
+    author: "Roberto Lee",
+    description: "A parent app that creates and manages child apps.",
+    category: "Convenience",
+    iconUrl: "",
+    iconX2Url: "",
+    singleInstance: true
+)
+
+preferences {
+    page(name: "mainPage", title: "RSCL Child App Configuration", install: true, uninstall: true) {
+        section("Settings for this room:") {
+            input "exampleSetting", "text", title: "Example Setting", required: true
+        }
+    }
+}
+
+def installed() {
+    log.debug "Parent App Installed"
+    initialize()
+}
+
+def updated() {
+    log.debug "Parent App Updated"
+    initialize()
+}
+
+def initialize() {
+    log.debug "Parent App Initialized"
+}
