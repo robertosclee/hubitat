@@ -1,5 +1,5 @@
 definition(
-    name: "RSCL_LA_parent",
+    name: "Lights Automations V1",
     namespace: "RSCL_LA",
     author: "Roberto Lee",
     description: "A parent app that creates and manages child apps.",
@@ -12,10 +12,11 @@ definition(
 preferences {
     page(name: "mainPageParent", title: "RSCL Parent App Configuration", install: true, uninstall: true) {
         section("Create a new child app:") {
-            app(name: "childApps", appName: "Child App", namespace: "RSCL_LA", title: "Add a New Child App", multiple: true)
+            app(name: "myChildApps", appName: "Lights Automations V1 Child", namespace: "RSCL_LA", title: "Add a New Child App", multiple: true)
         }
     }
 }
+
 
 def installed() {
     log.debug "Parent App Installed"

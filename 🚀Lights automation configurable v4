@@ -336,7 +336,7 @@ def initialize()
         subscribe(sensor, "pushed", triggerLightsOnHandler)
         subscribe(sensor, "doubleTapped", triggerLightsOnHandler)
         subscribe(sensor, "held", triggerLightsOnHandler)
-        
+
         subscribe(turnOnButtons, "pushed", buttonTurnOnPushedHandler)
         subscribe(turnOnButtons, "doubleTapped", buttonTurnOnDoubleTappedHandler)
         subscribe(turnOnButtons, "held", buttonTurnOnHeldHandler)
@@ -424,7 +424,7 @@ def triggerLightsOnHandler(evt)
     def deviceClass = evt.class
     
     state.lastautomation = nowDt()
-    ldebug("lastautomation: ${state.lastautomation}")       
+    ldebug("lastautomation: ${state.lastautomation}, deviceName: ${deviceName}")       
 }
 
 def modeChangedHandler(evt) 
