@@ -27,47 +27,20 @@ Map mainPage() {
 section("BASIC SETTINGS", hideable: true, hidden: true) 
 {
 paragraph """<style>
-table 
-{
-border-collapse: collapse;border: 1px solid black;padding: 0;margin: 0;
-}
-th, td 
-{
-border: 1px solid black;padding: 4px 2px 2px 2px;text-align: left;font-size:88%;
-}
-th 
-{
-padding: 2px;background-color: #f2f2f2;
-}
-table.noborder,table.noborder th, table.noborder td 
-{
-border: 0px solid black;padding: 0px;margin: 0px;
-}
+table           { border-collapse: collapse;border: 1px solid black;padding: 0;margin: 0;}
+th, td          { border: 1px solid black;padding: 4px 2px 2px 2px;text-align: left;font-size:88%;}
+th              { padding: 2px;background-color: #f2f2f2; }
+table.noborder,table.noborder th, table.noborder td     {border: 0px solid black;padding: 0px;margin: 0px;}
 
-.ninja
-{
-display:none;
-}
+.ninja          {display:none;}
 
-.mdl-cell 
-{
-margin: 5px !important;
-}
+.mdl-cell       {margin: 5px !important;}
 
-.mdl-button,.mdl-button--raised,.mdl-shadow--2dp
-{
--webkit-box-shadow: none !important; -moz-box-shadow: none !important; box-shadow: none !important; border: 1px solid #e1e1e1;
-}
+.mdl-button,.mdl-button--raised,.mdl-shadow--2dp { -webkit-box-shadow: none !important; -moz-box-shadow: none !important; box-shadow: none !important; border: 1px solid #e1e1e1;}
 
-.mdl-textfield__input
-{
-border-bottom: 1px solid rgb(221 207 207 / 32%);
-}
+.mdl-textfield__input { border-bottom: 1px solid rgb(221 207 207 / 32%); }
 
-.btn-group-lg>.btn, .btn-lg
-{
-padding: 5px 8px;
-}
+.btn-group-lg>.btn, .btn-lg { padding: 5px 8px; }
 
 div[id^="collapse"] > div > div > div.inputdivider
 {
@@ -75,35 +48,15 @@ div[id^="collapse"] > div > div > div.inputdivider
 margin-bottom: 5px; margin-top: 5px; border-bottom: 1px dashed #336699; height: 1px;
 }
 
-div[id^="collapse"] > div:last-child > div > div.inputdivider
-{
-background-color: #FFF; border-bottom: 0px dashed #eee; 
-}
+div[id^="collapse"] > div:last-child > div > div.inputdivider {background-color: #FFF; border-bottom: 0px dashed #eee; }
 
-.ninja
-{
-display:none;
-}
+button.submitOnChange  {padding: 0 5px;}
 
-button.submitOnChange 
-{
-padding: 0 5px;
-}
+div.statename   { width: 100px; float: left; border-bottom: 1px dotted #000;}
 
-div.statename
-{
-width: 100px; float: left; border-bottom: 1px dotted #000;
-}
+.yellow         { background-color: yellow; }
 
-.yellow
-{
-background-color: yellow;
-}
-
-.grey
-{
-background-color: grey;
-}
+.grey           { background-color: grey; }
 </style>"""       
     input "appName", "text", title: "Name", submitOnChange: true
     if(appName) app.updateLabel(appName)
@@ -111,10 +64,10 @@ background-color: grey;
     input "txtEnable", "bool", title: "Descriptive logging?", defaultValue: true, required: true, width: 4
     input "logEnable", "bool", title: "Extensive (debug) logging?", required: true, width: 4
 
-    input "aboutRoom", "enum", title: "Select room", options: ["h", "lr", "mb", "g", "k", "s", "w", "o", "d"], required: true, width: 6
+    input "aboutRoom", "enum", title: "Select room", options: ["h", "lr", "mb", "g", "k", "s", "w", "o", "d", "test"], required: true, width: 6
     input "includedModes", "mode", title: "Applicable modes", multiple: true, required: false, width: 6
-    input "sendMessage", "capability.notification", title: "Send to custom notification device (optional)", multiple: false, required: false, width: 6
-    input "sendMessageImportant", "capability.notification", title: "Send to important notification device (optional)", multiple: false, required: false, width: 6
+    input "sendMessageLog", "capability.notification", title: "Send log", multiple: true, required: false, width: 6
+    input "sendImportant", "capability.notification", title: "Send important phone notifications", multiple: true, required: false, width: 6    
 
     input "enableManual", "bool", title: "Allow manually override. After turning on lights. No automation active until lights are turned off.", defaultValue: true, width: 8 
     input name: "Save", type: "button", title: "Save", submitOnChange: true    
@@ -123,16 +76,16 @@ background-color: grey;
 def prefixInfo = "Room: <b>${aboutRoom}</b>, Mode: <b>${getMode()}</b>, Real: ${location.mode}, ${includedModes?.size()} modes: ${includedModes} "       
 if(allMotionSensors())
 {
-prefixInfo += "<br/>Last motion: ${getFormatted(state.lastmotiondt)} by ${state.lastmotionby}"
-prefixInfo += "<br/>Any motion: <b>${isAnyMotionActive(allMotionSensors())}</b>"
+    prefixInfo += "<br/>Last motion: ${getFormatted(state.lastmotiondt)} by ${state.lastmotionby}"
+    prefixInfo += "<br/>Any motion: <b>${isAnyMotionActive(allMotionSensors())}</b>"
 }
 
 
 prefixInfo += "<br/>Any lights on: <b>${isAnySwitchOn(allLights())}</b>"
 if(isAnySwitchOn(allLights()))        
 {
-prefixInfo += ", turning off at ${state.turnofftime > nowDt() ? getFormatted(state.turnofftime) : ""}, stayon: ${state.cfgStayon}s"
-prefixInfo += ", was turned on manually <b>${state.turnedonmanually}</b> and has been skipped <b>${skippedTurningOff}</b> times"
+    prefixInfo += ", turning off at ${state.turnofftime > nowDt() ? getFormatted(state.turnofftime) : ""}, stayon: ${state.cfgStayon}s"
+    prefixInfo += ", was turned on manually <b>${state.turnedonmanually}</b> and has been skipped <b>${skippedTurningOff}</b> times"
 }
         
 section("DEVICES", hideable: true, hidden: false) 
@@ -187,124 +140,121 @@ section("DEVICES", hideable: true, hidden: false)
     input name: "AllLightsOff", type: "button", title: "All lights off", submitOnChange: true, width: 1
 }
 
-	section("STATES ALL", hideable: true, hidden: true)
-    {
-        def allstate = "<table>"
-        allstate += "<tr><th colspan='3'>OWN</th></tr>"
-        states.each { key, value ->
-            allstate += "<tr><td>${key}</td><td colspan='2'>${states[key]}</td></tr>"
-        }        
-        allstate += "<tr><th colspan='3'>HUBITAT</th></tr>"
-        state.each { key, value ->
-            //state[key] = null // Reset each state variable to null
-            //allstate += "${key} : ${state[key]} = ${  (state[key]  instanceof Date)  }\n" 
-            
-            
-            if(key == "usedConfigHistory")
-            {
-                state[key].eachWithIndex{ cfgHistory, index ->
-                    allstate += "<tr><td>${index}</td><td>${cfgHistory.name}</td><td>${getFormatted(cfgHistory.time)}</td></tr>"
+        section("STATES ALL", hideable: true, hidden: true)
+        {
+            def allstate = "<table>"
+            allstate += "<tr><th colspan='3'>OWN</th></tr>"
+            states.each { key, value ->
+                allstate += "<tr><td>${key}</td><td colspan='2'>${states[key]}</td></tr>"
+            }        
+            allstate += "<tr><th colspan='3'>HUBITAT</th></tr>"
+            state.each { key, value ->
+                //state[key] = null // Reset each state variable to null
+                //allstate += "${key} : ${state[key]} = ${  (state[key]  instanceof Date)  }\n" 
+                
+                
+                if(key == "usedConfigHistory")
+                {
+                    state[key].eachWithIndex{ cfgHistory, index ->
+                        allstate += "<tr><td>${index}</td><td>${cfgHistory.name}</td><td>${getFormatted(cfgHistory.time)}</td></tr>"
+                    }
+                }
+                else
+                {
+                    allstate += "<tr><td>${key}</td><td colspan='2'>${state[key]}</td></tr>"
                 }
             }
-            else
-            {
-            	allstate += "<tr><td>${key}</td><td colspan='2'>${state[key]}</td></tr>"
-            }
+        
+            allstate += "</table>";
+            paragraph "<br/>All state:\n${allstate}"
         }
-       
-        allstate += "</table>";
-        paragraph "<br/>All state:\n${allstate}"
-    }
 
-    section("Mode Configurations", hideable: true, hidden: false) {
-        input "sourceMode", "enum", title: "Select Source Mode", options: includedModes, required: false, width: 3
-        input "targetMode", "enum", title: "Select Target Mode", options: includedModes, required: false, width: 3
-        input "Save", "button", title: "Save", submitOnChange: true, width: 2
-        input "copyButton", "button", title: "Copy Configurations", submitOnChange: true, width: 2
-        input "deleteButton", "button", title: "Delete target Configurations", submitOnChange: true, width: 2
-    }         
+        section("Mode Configurations", hideable: true, hidden: false) {
+            input "sourceMode", "enum", title: "Select Source Mode", options: includedModes, required: false, width: 3
+            input "targetMode", "enum", title: "Select Target Mode", options: includedModes, required: false, width: 3
+            input "Save", "button", title: "Save", submitOnChange: true, width: 2
+            input "copyButton", "button", title: "Copy Configurations", submitOnChange: true, width: 2
+            input "deleteButton", "button", title: "Delete target Configurations", submitOnChange: true, width: 2
+        }         
 
-    includedModes.each { mode ->
-        section(mode == getMode() ? "<b>Mode: ${mode}</b>" : "Mode: ${mode}", class: "grey", hideable: true, hidden:  mode == getMode() ? false : false) 
-        {
-			paragraph "${prefixInfo}"
-            
-            lightGroupArray().each { grp -> 
-                if(grp.devices)
-                {
-                    def devicesRelatedToGrp = "<span>"+grp.description+"</span>"
-                    if(isAnySwitchOn(grp.devices))
+        includedModes.each { mode ->
+            section(mode == getMode() ? "<b>Mode: ${mode}</b>" : "Mode: ${mode}", class: "grey", hideable: true, hidden:  mode == getMode() ? false : false) 
+            {
+                paragraph "${prefixInfo}"
+                
+                lightGroupArray().each { grp -> 
+                    if(grp.devices)
                     {
-                        devicesRelatedToGrp = "<span class='yellow'>${grp.description} = ${grp.devices.collect { it.currentValue("level") + "%" }.join(", ")}</span>"
+                        def devicesRelatedToGrp = "<span>"+grp.description+"</span>"
+                        if(isAnySwitchOn(grp.devices))
+                        {
+                            devicesRelatedToGrp = "<span class='yellow'>${grp.description} = ${grp.devices.collect { it.currentValue("level") + "%" }.join(", ")}</span>"
+                        }
+                        
+                        
+                        if(devicesRelatedToGrp)
+                        {
+                            paragraph "<u>${devicesRelatedToGrp}</u><br/>"
+                            
+                            stateGroupArray().each { s ->
+                            
+                                def nms = getConfig(mode, grp.id, s.id)
+                                if(s.devices)
+                                {
+                                    input "${nms.do}", "bool", title: "<div class='statename ${states.isRoomState == s.id ? "yellow" : ""}'>${boolToIcon(s.matchnow)} ${nms.statedescription} ${boolToArrowIcon(states.isRoomState == s.id)}</div> ${nms.values.do ? boolToOnOff(nms.values.turnon) : ""} ${nms.values.forcechange ? " for ${nms.values.stayon}s at ${nms.values.brightness}%" : ""}  ", required: false, defaultValue: false, width: 12
+                                }
+                                
+                            }                
+                        }
                     }
-                    
-                    
-                    if(devicesRelatedToGrp)
+
+
+                }
+                input name: "Save", type: "button", title: "Save", submitOnChange: true, width: 1  
+                input name: "AllLightsOff", type: "button", title: "All lights off", submitOnChange: true, width: 3
+            }
+                
+            
+            section(mode == getMode() ? "<b>Mode: ${mode} configurations</b>" : "Mode: ${mode} configurations", hideable: true, hidden: mode == getMode() ? false : true) 
+            {
+                lightGroupArray().each { grp -> 
+                    if(grp.devices)
                     {
+                        def devicesRelatedToGrp = "<span>"+grp.description+"</span>"
+                        if(isAnySwitchOn(grp.devices))
+                        {
+                            devicesRelatedToGrp = "<span class='yellow'>${grp.description} = ${grp.devices.collect { it.currentValue("level") + "%" }.join(", ")}</span>"
+                        }
                         paragraph "<u>${devicesRelatedToGrp}</u><br/>"
                         
                         stateGroupArray().each { s ->
-                           
                             def nms = getConfig(mode, grp.id, s.id)
-                            if(s.devices)
+
+                            if(nms.values.do)
                             {
-                                input "${nms.do}", "bool", title: "<div class='statename ${states.isRoomState == s.id ? "yellow" : ""}'>${boolToIcon(s.matchnow)} ${nms.statedescription} ${boolToArrowIcon(states.isRoomState == s.id)}</div> ${nms.values.do ? boolToOnOff(nms.values.turnon) : ""} ${nms.values.forcechange ? " for ${nms.values.stayon}s at ${nms.values.brightness}%" : ""}  ", required: false, defaultValue: false, width: 12
+                                paragraph "<b class='${states.isRoomState == s.id ? "yellow" : ""}'>${boolToIcon(s.matchnow)} ${nms.title} ${boolToArrowIcon(states.isRoomState == s.id)}</b>", width: 2
+                                input "${nms.turnon}", "bool", title: "turn on? <code class='ninja yellow'>${nms.turnon}</code>", required: false, defaultValue: false, width: 2
+                                if(nms.values.turnon)
+                                {
+                                    input "${nms.forcechange}", "bool", title: "force settings? <code class='ninja yellow'>${nms.forcechange}</code>", required: false, defaultValue: false, width: 2
+                                    input "${nms.stayon}", "number", title: "stay on in seconds <code class='ninja yellow'>${nms.stayon}</code>", required: true, defaultValue: 30, width: 2
+                                    input "${nms.brightness}", "number", title: "brightness (0-100) <code class='ninja yellow'>${nms.brightness}</code>", required: true, defaultValue: 88, width: 2
+                                    input "${nms.color}", "color", title: "color <code class='ninja yellow'>${nms.color}</code>", required: false, defaultValue: "#ffffff", width: 1
+                                }
+
+                                input name: "Save", type: "button", title: "Save", submitOnChange: true, width: 1   
+                                paragraph "<div class='inputdivider'>&nbsp;</div>"
                             }
-							
-                        }                
-                    }
-                }
+                            
 
-
-            }
-            input name: "Save", type: "button", title: "Save", submitOnChange: true, width: 1  
-            input name: "AllLightsOff", type: "button", title: "All lights off", submitOnChange: true, width: 3
-        }
-               
-        
-        section(mode == getMode() ? "<b>Mode: ${mode} configurations</b>" : "Mode: ${mode} configurations", hideable: true, hidden: mode == getMode() ? false : true) 
-        {
-            lightGroupArray().each { grp -> 
-                if(grp.devices)
-                {
-                    def devicesRelatedToGrp = "<span>"+grp.description+"</span>"
-                    if(isAnySwitchOn(grp.devices))
-                    {
-                        devicesRelatedToGrp = "<span class='yellow'>${grp.description} = ${grp.devices.collect { it.currentValue("level") + "%" }.join(", ")}</span>"
-                    }
-                    paragraph "<u>${devicesRelatedToGrp}</u><br/>"
-                    
-                    stateGroupArray().each { s ->
-                        def nms = getConfig(mode, grp.id, s.id)
-
-                        if(nms.values.do)
-                        {
-                            paragraph "<b class='${states.isRoomState == s.id ? "yellow" : ""}'>${boolToIcon(s.matchnow)} ${nms.title} ${boolToArrowIcon(states.isRoomState == s.id)}</b>", width: 2
-                            input "${nms.turnon}", "bool", title: "turn on? <code class='ninja yellow'>${nms.turnon}</code>", required: false, defaultValue: false, width: 2
-                            if(nms.values.turnon)
-                            {
-                                input "${nms.forcechange}", "bool", title: "force settings? <code class='ninja yellow'>${nms.forcechange}</code>", required: false, defaultValue: false, width: 2
-                                input "${nms.stayon}", "number", title: "stay on in seconds <code class='ninja yellow'>${nms.stayon}</code>", required: true, defaultValue: 30, width: 2
-                                input "${nms.brightness}", "number", title: "brightness (0-100) <code class='ninja yellow'>${nms.brightness}</code>", required: true, defaultValue: 88, width: 2
-                                input "${nms.color}", "color", title: "color <code class='ninja yellow'>${nms.color}</code>", required: false, defaultValue: "#ffffff", width: 1
-                            }
-
-                            input name: "Save", type: "button", title: "Save", submitOnChange: true, width: 1   
-                            paragraph "<div class='inputdivider'>&nbsp;</div>"
                         }
-                        
-
                     }
+                    
+                    
                 }
                 
-                
             }
-            
-        }
-    } 
-        
-
-
+        } 
         
 	}
 }
@@ -383,6 +333,7 @@ def initialize()
     if(turnOnButtons)
     {
         ldebug("subscribing ${turnOnButtons}")
+        subscribe(sensor, "pushed", deviceHandler)
         subscribe(turnOnButtons, "pushed", buttonTurnOnPushedHandler)
         subscribe(turnOnButtons, "doubleTapped", buttonTurnOnDoubleTappedHandler)
         subscribe(turnOnButtons, "held", buttonTurnOnHeldHandler)
@@ -400,6 +351,7 @@ def initialize()
     {
         motionSensorsTurnOn.each { sensor ->
             ldebug("subscribing ${sensor}")
+            subscribe(sensor, "motion.active", deviceHandler)            
             subscribe(sensor, "motion.active", motionDetectedTurnOnHandler)
             subscribe(sensor, "motion.inactive", motionStoppedTurnOnHandler)
         }
@@ -413,10 +365,12 @@ def initialize()
         }
     }
     ldebug ("events subscriptions added")
+
+    sendLog("App is initialized")
 }
 
 //EVENTS SUBSCRIPTIONS START
-def lightSwitchesHandler(evt)
+def lightSwitchesHandler(evt) //WHEN LIGHTS TURNED ON BY AUTOMATION OR MANUALLY
 {
     state.callMethod = "lightSwitchesHandler"
     def device = evt.device
@@ -427,25 +381,61 @@ def lightSwitchesHandler(evt)
     //DETERMINE IF LIGHTS ARE TURNED ON MANUALLY
     if(deviceStatus == "on" && enableManual)
     {
-        def thresholdDetermineIfAutomation = 1000
-        def elapsedTime = calculateSecondsBetweenDates(parseToDate(state.lastautomation), new Date())
-        //ldebug("lastautomation: ${state.lastautomation} - now: ${nowDt()} elapsedTime: ${elapsedTime/(60*60)}, probably${  elapsedTime > thresholdDetermineIfAutomation ? " no " : " "  }automation")
-
-        ldebug("elapsedTime since last automation: ${elapsedTime/(60*60)}, likely ${  elapsedTime > thresholdDetermineIfAutomation ? "manually" : "automation"  }")
+        def thresholdDetermineIfAutomation = 10000 //MS
+        def elapsedTime = calculateMsBetweenDates(parseToDate(state.lastautomation), new Date())
+        def elapsedTimeInMinutes = elapsedTime / (1000) / 60
+        ldebug("elapsedTime since last automation (${state.lastautomation}): ${elapsedTime}ms, likely ${  elapsedTime > thresholdDetermineIfAutomation ? "manually" : "automation"  } = ${elapsedTimeInMinutes}min")
 
         if(elapsedTime > thresholdDetermineIfAutomation)
         {
-            //ldebug("elapsedTime (${elapsedTime}) > ${thresholdDetermineIfAutomation}, ${deviceName} was turned on manually")
+            sendLog("manually via voice/button, elapsedTime (${elapsedTime}) > threshold (${thresholdDetermineIfAutomation})")
             state.turnedonmanually = true
             state.skippedTurningOff = 0
+        }
+        else
+        {
+            sendLog("automated, elapsedTime (${elapsedTime}) < threshold (${thresholdDetermineIfAutomation})")
         }
     }
     else
     {
         ldebug("device ${deviceName} to ${deviceStatus}, automation is active")
+        if(state.turnedonmanually)
+        {
+            sendLog("Turned manually is false again. Lights automation is active again")
+        }
+
         state.turnedonmanually = false
         state.skippedTurningOff = 0
     }    
+
+    state.turnedonmanually = false
+}
+
+def deviceHandler(evt) 
+{
+    state.callMethod = "deviceHandler"
+    def device = evt.device
+    def deviceName = device.displayName
+    def deviceStatus = evt.value
+    def deviceClass = evt.class
+    
+    state.lastautomation = nowDt()
+    ldebug("lastautomation: ${state.lastautomation}")       
+    
+
+
+
+
+    if (evt?.physical) {
+        log.debug "Device was physically interacted with"
+        // Handle manual override or other actions
+    } else {
+        log.debug "Device was triggered digitally"
+        // Handle automation actions
+    }
+
+    ldebug("${deviceName} to <b>${deviceStatus}</b> and physical: ${evt?.physical} and class: ${deviceClass}")
 }
 
 def modeChangedHandler(evt) 
@@ -460,7 +450,7 @@ def modeChangedHandler(evt)
     }
     if(  ["SleepAll", "Away"].contains(getMode())  ||  ["SleepSome"].contains(getMode()) && ["h","mb"].contains(aboutRoom) )
     {
-        turnOffAllLights()
+        turnOffAllLights(true)
         linfo("mode changed to ${getMode()}, all lights off")
     }
     else
@@ -533,7 +523,7 @@ def houseDoorsHandler(evt)
 
 def motionDetectedTurnOnHandler(evt) 
 {
-    motionDetectedHandler(evt)
+    motionHandler(evt)
 
     //ONLY HANDLE LIGHTS IF ALL LIGHTS ARE OFF
     if(!isAnySwitchOn(allLights()))
@@ -544,17 +534,17 @@ def motionDetectedTurnOnHandler(evt)
 
 def motionDetectedKeepOnHandler(evt)
 {
-    motionDetectedHandler(evt)
+    motionHandler(evt)
 }
 
-def motionDetectedHandler(evt)
+def motionHandler(evt)
 {
-    state.callMethod = "motionDetectedHandler"
+    state.callMethod = "motionHandler"
     def device = evt.device
     def deviceName = device.displayName
     def deviceStatus = evt.value
     
-    linfo("motion ${deviceName} to ${deviceStatus}, ${ isAnySwitchOn(allLights()) ? "keep on lights" : "turn on lights accordingly" }")
+    linfo("motion ${deviceName} to ${deviceStatus}, ${ isAnySwitchOn(allLights()) ? "💡 keep on" : "💡 turn on accordingly" }")
     state.lastmotiondt = nowDt()
     state.lastmotionby = deviceName    
     unschedule()
@@ -581,10 +571,13 @@ def motionStoppedReschedule(evt, m)
     def deviceName = device.displayName // Get the name of the light
     def deviceStatus = evt.value // Get the value (should be "off" in this case)    
     
-    //TEST IF LIGHTS ARE ON?
-    if(isAnySwitchOn(allLights()))
+    //TEST IF LIGHTS ARE ON AND ALL MOTION OFF?
+    if(  isAnySwitchOn(allLights()) && !isAnyMotionActive(allMotionSensors()) )
     {
-        if ( ["h","lr","mb","k", "g", "o", "d"].contains(aboutRoom) ) //ROOMS WITH MOTION SENSORS
+        // Use a set for faster lookup
+        def roomsWithMotionSensors = ["h", "lr", "mb", "k", "g", "o", "d"] as Set
+
+        if ( roomsWithMotionSensors.contains(aboutRoom) ) //ROOMS WITH MOTION SENSORS
         {
             if(state.cfgStayon > 0 && state.cfgStayon != null )
             {
@@ -612,29 +605,34 @@ def motionStoppedReschedule(evt, m)
 
 def buttonTurnOnPushedHandler(evt)
 {
-    state.callMethod = "lightSwitchesHandler"
+    state.callMethod = "buttonTurnOnPushedHandler"
     def device = evt.device
     def deviceName = device.displayName
     def deviceStatus = evt.value
     linfo("${deviceName} to <b>${deviceStatus}</b>, lights on: ${isAnySwitchOn(allLights())}")
+    /*
     if(evt.value == "1")
     {
+        sendLog("Lights turned on manually via button")
         state.turnedonmanually = true
     }
+    */
     
 }
 
 def buttonTurnOnHeldHandler(evt)
 {
-    state.callMethod = "lightSwitchesHandler"
+    state.callMethod = "buttonTurnOnHeldHandler"
     def device = evt.device
     def deviceName = device.displayName
     def deviceStatus = evt.value
     linfo("HELD, ${deviceName} to <b>${deviceStatus}</b>, lights on: ${isAnySwitchOn(allLights())}")
+    /*
     if(evt.value == "1")
     {
         //state.turnedonmanually = true
     }
+    */
 }
 
 //EVENTS SUBSCRIPTIONS END
@@ -644,12 +642,10 @@ def buttonTurnOnHeldHandler(evt)
 void handleLightsBasedOnConfig(states, configs, lights)
 {
     state.callMethod = "handleLightsBasedOnConfig"
-    ldebug("<code class='yellow'>${configs.base}</code>") //${configs.base.class}
+    ldebug("<code style='background-color: yellow'>${configs.base}</code>, values: ${configs.values}")
     addConfigItem(configs.base)
-    ldebug("CONFIGS: ${configs.base}")
     if(configs.values && configs.values.do)
     {
-        linfo("CONFIGS: ${configs.values}")
         if( configs.values.turnon && configs.values.forcechange )
         {
             turnOnLights(states, configs, lights, comment = "ON FORCED ${configs.values}") 
@@ -672,35 +668,44 @@ void handleLightsBasedOnConfig(states, configs, lights)
 void turnOnLights(states, configs, lights, comment = "")
 {
     state.callMethod = "turnOnLights"
-    state.lastautomation = nowDt()
     state.cfgStayon = configs.values.stayon
+
     if(appEnabled)
     {
         lights.each { light ->
-                if( (configs.values.turnon && configs.values.forcechange) || (configs.values.turnon && state.modeJustChanged) ) //|| !isAnySwitchOn(allLights())
+                if( configs.values.turnon ) //|| !isAnySwitchOn(allLights())
                 {
-                    state.modeJustChanged = false
-                    if(isColorDevice(light))
+                    //MODEJUSTCHANGED TO RESET LIGHTS TO SETTINGS
+                    if(configs.values.forcechange || state.modeJustChanged)
                     {
-                        def hsl = hexToHSL(configs.values.color)
-                        light.setColor([hue: hsl.hue, saturation: hsl.saturation, level: configs.values.brightness])
-                        linfo ("TURN ON, FIXED COLOR ${light.displayName}: ${hsl}")
+                        state.modeJustChanged = false
+
+                        if(isColorDevice(light))
+                        {
+                            def hsl = hexToHSL(configs.values.color)
+                            light.setColor([hue: hsl.hue, saturation: hsl.saturation, level: configs.values.brightness])
+                            linfo ("${light.displayName} ON, COLOR: ${hsl}")
+                            sendLog("${light.displayName} ON, following color settings ${hsl}")
+                        }
+                        else
+                        {
+                            light.setLevel(configs.values.brightness)
+                            linfo ("${light.displayName} ON, LEVEL: ${configs.values.brightness}%")
+                            sendLog("${light.displayName} ON, following brightness settings ${configs.values.brightness}%")
+                        }
                     }
                     else
                     {
-                        light.setLevel(configs.values.brightness)
-                        linfo ("TURN ON, FIXED LEVEL ${light.displayName}: ${configs.values.brightness}%")
+                        linfo ("${light.displayName} ON, NO CHANGE SETTING ${light.displayName} [${configs.do}], ${comment}")
+                        sendLog("${light.displayName} ON, not following settings")
+                        light.on()
                     }
                 }
-                else if( configs.values.turnon && !configs.values.forcechange)
-                {
-                    light.on()
-                    linfo("TURN ON ONLY, NO CHANGE SETTING ${light.displayName} [${configs.do}], ${comment}")
-                }                
                 else if( !configs.values.turnon )
                 {
                     light.off()
-                    linfo("TURN OFF ${light.displayName} [${configs.turnon}], ${comment}")
+                    linfo("${light.displayName} OFF [${configs.turnon}], ${comment}")
+                    sendLog("${light.displayName} OFF")
                 }
 
 
@@ -711,18 +716,19 @@ void turnOnLights(states, configs, lights, comment = "")
     }
     else
     {
-        linfo("TURN ON LIGHTS NOT SUCCESSFUL, APP DISABLED")
+        linfo("ON LIGHTS NOT SUCCESSFUL, APP DISABLED")
     }
 }
 
-def turnOffAllLights() 
+def turnOffAllLights(force = false) 
 {
     state.callMethod = "turnOffAllLights"
     //if(state.turnedonmanually && state.skippedTurningOff <= 10)
-    if(state.turnedonmanually) //TODO state name change?
+    if(state.turnedonmanually && !force) //TODO state name change?
 	{
-        state.skippedTurningOff = state.skippedTurningOff + 1
+        state.skippedTurningOff += 1
         ldebug("Skip turn off, was manually turned on, skipped turning off: ${state.skippedTurningOff}")
+        sendLog("skipped turned off, manually turned on: ${state.turnedonmanually}")
     }
     else
     {
@@ -738,6 +744,25 @@ def turnOffAllLights()
 def turnOffLights(lights) 
 {
     state.callMethod = "turnOffLights"
+    if (!appEnabled) {
+        linfo("TURN OFF LIGHTS NOT SUCCESSFUL, APP DISABLED")
+        return
+    }
+
+    if (!lights) {
+        linfo("Turning off lights not successful, no lights provided")
+        return
+    }
+
+    if (isAnySwitchOn(lights)) 
+    {
+        linfo("Turning off ${lights} lights")
+        lights.off()
+        sendLog("Turned off")
+    } else {
+        linfo("Lights ${lights} already off")
+    }    
+    /*
     if(appEnabled)
     {
         if(lights)
@@ -746,6 +771,7 @@ def turnOffLights(lights)
             {
                 linfo ("Turning off ${lights} lights")
                 lights?.off()
+                sendLog("turned off")
             }
             else
             {
@@ -761,15 +787,16 @@ def turnOffLights(lights)
     {
         linfo("TURN OFF LIGHTS NOT SUCCESSFUL, APP DISABLED")
     }
+    */
 }
 
 def checkMotionAndTurnOff() 
 {
     state.callMethod = "checkMotionAndTurnOff"
     def currentMode = getMode()
-    ldebug(" [mb].contains(aboutRoom) : ${ ["mb"].contains(aboutRoom)}")
-    ldebug(" [SleepAll, SleepSome, SleepSomeEarlyWorkday].contains(currentMode) : ${["SleepAll", "SleepSome", "SleepSomeEarlyWorkday"].contains(currentMode)}")
-    ldebug("state.turnedonmanually : ${state.turnedonmanually } and isAnyMotionActive(motionSensorsTurnOn) : ${isAnyMotionActive(motionSensorsTurnOn)}")
+    //ldebug(" [mb].contains(aboutRoom) : ${ ["mb"].contains(aboutRoom)}")
+    //ldebug(" [SleepAll, SleepSome, SleepSomeEarlyWorkday].contains(currentMode) : ${["SleepAll", "SleepSome", "SleepSomeEarlyWorkday"].contains(currentMode)}")
+    //ldebug("state.turnedonmanually : ${state.turnedonmanually } and isAnyMotionActive(motionSensorsTurnOn) : ${isAnyMotionActive(motionSensorsTurnOn)}")
     
     if( ["mb"].contains(aboutRoom)
         && ["SleepAll", "SleepSome", "SleepSomeEarlyWorkday"].contains(currentMode) 
@@ -793,7 +820,7 @@ def checkMotionAndTurnOff()
     {
         state.callMethod = "checkMotionAndTurnOff"
         unschedule()
-        linfo ("Still motion, rescheduling turning off lights with ${state.cfgStayon}s")    
+        linfo ("Still motion, turning off rescheduled with ${state.cfgStayon}s")    
         runIn(state.cfgStayon, checkMotionAndTurnOff) // Check again after 1 minute if motion persists
     }
 }
@@ -811,13 +838,16 @@ def roomsHandler()
     state.callMethod = "roomsHandler"
     state.turnedonmanually = false
     
-    if(aboutRoom == "h"){ handleHallway() }
-    else if(aboutRoom == "mb"){ handleMasterBedroom() }
-    else if(aboutRoom == "lr"){ handleLivingRoom() }
-    else if(aboutRoom == "o"){ handleOffice() }
+    if(aboutRoom == "test"){ handleHallway() }
+    else if ( ["h"].contains(aboutRoom) ) { handleHallway() }
+    else if ( ["mb"].contains(aboutRoom) ) { handleMasterBedroom() }
+    else if ( ["lr"].contains(aboutRoom) ) { handleLivingRoom() }
+    else if ( ["o"].contains(aboutRoom) ) { handleOffice() }
     else if ( ["g", "k", "d"].contains(aboutRoom) ) { handleSimpleMotion() }
     else if ( ["w", "s"].contains(aboutRoom) ) { handleSimpleDoor() }    
 }
+
+//test
 
 void settingsHandler(states)
 {
@@ -836,14 +866,9 @@ void handleHallway(manual = "")
 {
     state.callMethod = "handleHallway"
     def states = allStates()
-    
-    //def currentMode = getMode()
-    
-    //logdebug("states ${states}", "handleHallway")
 
     if(states.isvalidmode)
     {
-        linfo("Hallway")
         if(false)
         {
         
@@ -978,7 +1003,6 @@ void handleMasterBedroom(manual = "")
     def callMethod = "handleMasterBedroom"
     def currentMode = getMode()
     def states = allStates()
-    //ldebug("states ${states}") 
     
     if(states.isvalidmode)
     {
@@ -1021,8 +1045,7 @@ void handleLivingRoom(manual = "")
     def callMethod = "handleLivingRoom"
     def currentMode = getMode()
     def states = allStates()
-    ldebug("states ${states}")   
-    
+   
     if(states.isvalidmode)
     {
 
@@ -1071,14 +1094,6 @@ void handleLivingRoom(manual = "")
     }
 }
 
-
-
-
-
-
-
-
-
 void handleSimpleMotion(manual = "") //LOW LIGHT AND MOTION ON OR OFF
 {
     state.callMethod = "handleSimpleMotion"
@@ -1097,7 +1112,6 @@ void handleSimpleMotion(manual = "") //LOW LIGHT AND MOTION ON OR OFF
         }           
     }
 }
-
 
 void handleSimpleDoor(manual = "") //CONTACT ON OR OFF
 {
@@ -1151,7 +1165,7 @@ void appButtonHandler(String buttonName)
     if (buttonName == "AllLightsOff") 
     {
         ldebug( "Off lights off button logic executed")
-        turnOffAllLights()
+        turnOffAllLights(true)
     }    
     
     if (buttonName == "AllMotionInActive") 
@@ -1173,7 +1187,9 @@ void appButtonHandler(String buttonName)
 }
 
 
-def copyConfigurations() {
+def copyConfigurations() 
+{
+    state.callMethod = "copyConfigurations"
     if (sourceMode != targetMode) 
     {
             lightGroupArray().each { grp -> 
@@ -1199,7 +1215,9 @@ def copyConfigurations() {
     }
 }
 
-def deleteConfigurations() {
+def deleteConfigurations() 
+{
+    state.callMethod = "deleteConfigurations"
     if (sourceMode != targetMode) 
     {
             lightGroupArray().each { grp -> 
@@ -1262,7 +1280,7 @@ def l(message, logPostfix = "", logLevel = debug)
             }
             break
         case 'warn':
-            log.warn logMessage
+            log.warn "⚠️" + logMessage
             break
         case 'error':
             log.error logMessage
@@ -1345,11 +1363,6 @@ def getMode()
 
 def getConfig(modename, lightnameId, statenameId)
 {
-    /*
-    ldebug("modename: ${modename}")
-    ldebug("lightname: ${lightname}")
-    ldebug("statename: ${statename}")
-    */
     state.callMethod = "getConfig"
     def result = []
 
@@ -1361,12 +1374,8 @@ def getConfig(modename, lightnameId, statenameId)
         {
             def l = lightGroupArray().find { it.id == lightnameId }.description
             def s = stateGroupArray().find { it.id == statenameId }.description
-            //logdebug l
-            //logdebug s
-            //def stateDescription = "${statename}: ${s}"
             def stateDescription = "${s}"
             def base = "${modename}_${lightnameId}_${statenameId}"
-        	//ldebug("base: ${base}")
             
             //def titleGrpState = "<table class='noborder'><tr><td>🧩</td><td>${modename.toUpperCase()}</td></tr><tr><td>💡</td><td>${l.toLowerCase()}</td></tr><tr><td>⚙️</td><td>${s.toLowerCase()}</td></tr></table>"
             def titleGrpState = "⚙️${s?.toLowerCase()}"
@@ -1394,7 +1403,7 @@ def getConfig(modename, lightnameId, statenameId)
         }
         else
         {
-            ldebug ("❌not found in arrays, modename: ${modename}, lightname : ${lightname} : ${isValidLight}, statename: ${statename} : ${isValidState}")
+            ldebug ("❌settings not found, modename: ${modename}, lightname : ${lightname} : ${isValidLight}, statename: ${statename} : ${isValidState}")
             result = [
                 base: "no_configuration"
             ]            
@@ -1402,9 +1411,9 @@ def getConfig(modename, lightnameId, statenameId)
     }
     else
     {
-        ldebug ("❌returning empty, not found in arrays, modename: ${modename}, lightname : ${lightname} : ${isValidLight}, statename: ${statename} : ${isValidState}")
+        ldebug ("❌parameter empty, not settings, modename: ${modename}, lightname : ${lightname} : ${isValidLight}, statename: ${statename} : ${isValidState}")
         result = [
-            base: "invalid_parameters"
+            base: "invalid_amount_parameters"
         ]
     }    
     return result
@@ -1413,7 +1422,6 @@ def getConfig(modename, lightnameId, statenameId)
 def allStates()
 {
     state.callMethod = "allStates"
-    //ldebug ("All states constructed")
     def currentmode = getMode()
     def isConsideredDark = isSwitchOn(isDarkSwitch) || luxSensor?.currentIlluminance < luxThreshold
 
@@ -1453,13 +1461,8 @@ def allStates()
             isWeekDay: ["Mon", "Tue", "Wed", "Thu", "Fri"].contains(new Date().format("E", location.timeZone)),
             //isEarlyWorkTime: isTimeBetween("04:20", "05:30") && ["Mon", "Tue", "Wed", "Thu", "Fri"].contains(new Date().format("E", location.timeZone)),
             //isEarlyWorkTime: isTimeBetween("13:05", "13:07") && ["Mon", "Tue", "Wed", "Thu", "Fri"].contains(new Date().format("E", location.timeZone)),
-            ]
+        ]
 }
-
-
-
-
-
 
 //SMALL FUNCTIONS
 def isAnySwitchOn(devices)
@@ -1472,7 +1475,6 @@ def isAnySwitchOn(devices)
 
 def isAnyMotionActive(devices)
 {
-    state.callMethod = "isAnyMotionActive"
    	def anyActive =  devices.find { sensor ->
         isMotionActive(sensor)
     }
@@ -1515,16 +1517,11 @@ def isColorDevice(device)
     return device.hasCapability("ColorControl")
 }
 
-
-
-
-
-
 def getLatestStatesSortedByTime(devices, attribute) {
     def latestStates = devices.collect { device ->
         def latestState = device.latestState(attribute)
         [
-            device: device.displayName, 
+            device: device?.displayName, 
             value: latestState?.value, 
             time: latestState?.date
         ]
@@ -1537,6 +1534,8 @@ def getLatestStatesSortedByTime(devices, attribute) {
 
 def humanizeDatetime(inputTime) 
 {
+    state.callMethod = "humanizeDatetime"
+
     if(isDate(inputTime))
     {
         try
@@ -1550,7 +1549,6 @@ def humanizeDatetime(inputTime)
             def days = hours / 24
             def months = days / 30
             def years = days / 365
-
 
             if(diff < 0)
             {
@@ -1582,7 +1580,9 @@ def humanizeDatetime(inputTime)
 }
 
 
-def isTimeBetween(timeStart, timeEnd) {
+def isTimeBetween(timeStart, timeEnd) 
+{
+    state.callMethod = "isTimeBetween"
     def now = new Date()
     def start = parseTime(timeStart)
     def end = parseTime(timeEnd)
@@ -1591,17 +1591,26 @@ def isTimeBetween(timeStart, timeEnd) {
     if (end < start) {
         end += 24 * 60 * 60 * 1000 // add a day in milliseconds
     }
-
-    return now >= start && now <= end
+   
+    def result = now >= start && now <= end
+    ldebug("isTimeBetween: ${timeStart} - ${timeEnd} = ${start} - ${end} = ${result}")
+    return result
 }
 
-def parseTime(timeStr) {
+def parseTime(timeStr) 
+{
+    state.callMethod = "parseTime"
     def timeParts = timeStr.split(':')
     def now = new Date()
-    return new Date(now.year, now.month, now.date, timeParts[0].toInteger(), timeParts[1].toInteger())
+    def result = new Date(now.year, now.month, now.date, timeParts[0].toInteger(), timeParts[1].toInteger())
+    ldebug("parseTime: ${timeStr} = ${result}")
+    return result
 }
 
-def hexToHSL(hex) {
+def hexToHSL(hex) 
+{
+    state.callMethod = "hexToHSL"
+
     // Remove the # symbol if present
     hex = hex.replace("#", "")
 
@@ -1640,6 +1649,7 @@ def hexToHSL(hex) {
     s = Math.round(s * 100)
     l = Math.round(l * 100)
 
+    ldebug("hex: ${hex} = HSL: ${h}, ${s}, ${l}")
     return [hue: h, saturation: s, level: l]
 }
 
@@ -1655,9 +1665,12 @@ def isDate(input) {
     return input instanceof Date
 }
 
-def addSecondsToNow(seconds, format = "yyyy-MM-dd'T'HH:mm:ss.SSS") {
+def addSecondsToNow(seconds, format = "yyyy-MM-dd'T'HH:mm:ss.SSS") 
+{
+    state.callMethod = "addSecondsToNow"
     def now = new Date()
     def newTime = new Date(now.time + (seconds * 1000))
+    ldebug("addSecondsToNow: ${seconds} seconds from now: ${newTime}")
     return newTime.format(format)
 }
 
@@ -1666,37 +1679,25 @@ def nowDt(format = "yyyy-MM-dd'T'HH:mm:ss.SSS")
     return new Date().format(format)
 }
 
-def parseToDate(dateString, format = "yyyy-MM-dd'T'HH:mm:ss.SSS") {
+def parseToDate(dateString, format = "yyyy-MM-dd'T'HH:mm:ss.SSS") 
+{
+    state.callMethod = "parseToDate"
+    ldebug("parseToDate: ${dateString}")
     return Date.parse(format, dateString)
 }
 
-def calculateSecondsBetweenDates(Date startDate, Date endDate) {
-    // Calculate the difference in milliseconds
-    def differenceInMillis = endDate.time - startDate.time
-
-    // Convert milliseconds to seconds
-    return differenceInMillis / 1000
-}
-
-/*
-def retrieveDate(key, format = "yyyy-MM-dd'T'HH:mm:ss.SSS") 
+def calculateSecondsBetweenDates(Date startDate, Date endDate) 
 {
-    state.callMethod = "retrieveDate"
-    if (state[key]) {
-        try {
-            def parsedDate = Date.parse(format, state[key])
-            //log.debug "Parsed Date from state[$key]: ${parsedDate}"
-            return parsedDate
-        } catch (Exception e) {
-            logerror("Failed to parse stored date from state[$key]: ${state[key]}. Error: ${e.message}", callMethod)
-            return null
-        }
-    } else {
-        logwarn("No date stored in state[$key].", callMethod)
-        return null
-    }
+    return calculateMsBetweenDates(startDate, endDate) / 1000
 }
-*/
+
+def calculateMsBetweenDates(Date startDate, Date endDate) 
+{
+    state.callMethod = "calculateMsBetweenDates"
+    def differenceInMillis = endDate.time - startDate.time
+    ldebug("startDate: ${startDate}, endDate: ${endDate}, diff: ${differenceInMillis}")
+    return differenceInMillis
+}
 
 def retrieveDt(input, format = "yyyy-MM-dd'T'HH:mm:ss.SSS") 
 {
@@ -1721,30 +1722,17 @@ def getFormatted(input, format = "HH:mm:ss.SSS")
         def result = retrieveDt(input)
         if(result)
         {
-            //return "${result.format("yyyy-MM-dd - HH:mm:ss.SSS")} (${humanizeDatetime(result)})" 
             return "${result.format(format)} (${humanizeDatetime(result)})" 
         }
 }
-
-/*
-def getFormatted(key, format = "HH:mm:ss.SSS")
-{
-        def result = retrieveDate(key)
-        if(result)
-        {
-            //return "${result.format("yyyy-MM-dd - HH:mm:ss.SSS")} (${humanizeDatetime(result)})" 
-            return "${result.format(format)} (${humanizeDatetime(result)})" 
-        }
-}
-*/
 
 def getHumanize(key)
 {
-        def result = retrieveDate(key)
-        if(result)
-        {
-            return humanizeDatetime(result)
-        }
+    def result = retrieveDate(key)
+    if(result)
+    {
+        return humanizeDatetime(result)
+    }
 }
 
 String boolToOnOff(value = false) 
@@ -1752,19 +1740,16 @@ String boolToOnOff(value = false)
     if(value) return value ? "on" : "off"
     return "off"
 }
-
 String boolToYesNo(value = false) 
 {
     if(value) return value ? "yes" : "no"
     return "no"
 }
-
 String boolToIcon(value = false) 
 {
     if(value) return value ? "&#10003;" : "&#10007;"
     return "&#10007;"
 }
-
 String boolToArrowIcon(value = false) 
 {
     if(value) return value ? "&#10140;" : ""
@@ -1784,4 +1769,47 @@ void addConfigItem(String configName)
     if (state.usedConfigHistory.size() > 5) {
         state.usedConfigHistory = state.usedConfigHistory.take(5)
     }
+}
+
+void sendLog(String message)
+{
+    state.callMethod = "sendLog"
+    if (sendMessageLog) 
+    {
+        sendMessage(sendMessageLog, message)
+    }
+}
+
+void sendImportant(String message)
+{
+    state.callMethod = "sendImportant"
+    if (sendMessageImportant) 
+    {
+        sendMessage(sendMessageImportant, message)
+    }
+}
+
+//void sendMessage(Object inputObject, String message)
+void sendMessage(Object devices, String message)
+{
+    state.callMethod = devices?.id ?: "sendMessage"
+    if (devices) 
+    {
+        devices.each { device ->
+            if (device.hasCapability("Notification")) 
+            {
+                def msg = "[⚙️${settings.aboutRoom}] ➜ ${message}"
+                device.deviceNotification(msg)
+                //ldebug(msg)
+            }
+            else 
+            {
+                lwarn("Device ${device.displayName} does not support notifications")
+            }                     
+        }            
+    }
+    else 
+    {
+        lwarn("No devices provided for sending message: ${message}")
+    }    
 }
