@@ -867,8 +867,6 @@ def roomsHandler()
     else if ( isAboutRoom("w,s") ) { handleSimpleDoor() }    
 }
 
-//test
-
 void settingsHandler(states)
 {
     state.callMethod = "settingsHandler"
@@ -964,10 +962,6 @@ void handleSimpleDoor(manual = "") //CONTACT ON OR OFF
     }
 }
 //HANDLE ROOM END
-
-
-
-
 
 
 
@@ -1362,8 +1356,6 @@ def getLatestStatesSortedByTime(devices, attribute) {
     return latestStates
 }
 
-
-
 def humanizeDatetime(inputTime) 
 {
     state.callMethod = "humanizeDatetime"
@@ -1408,9 +1400,7 @@ def humanizeDatetime(inputTime)
     {
         return "N/A"
     }
-    
 }
-
 
 def isTimeBetween(timeStart, timeEnd) 
 {
