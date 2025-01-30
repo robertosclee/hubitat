@@ -249,20 +249,7 @@ def statusAndAlert(data)
     def joinChars = "\n"
     if (lightsOn) 
     {
-        ldebug("state.lightsStates = ${state.lightsStates}")
-        ldebug("lightsOn: ${lightsOn}")
-        ldebug("lightsOn.collect = ${lightsOn.collect { it.id } }")
-/*
-        
-        ldebug("state.lightsStates.collect = ${state.lightsStates.collect { it.id } }")
-        ldebug("state.lightsStates.collect = ${state.lightsStates.collect { it.id.class } }")
-        ldebug("state.lightsStates.find = ${state.lightsStates.find {  it.id.toString() == "40" } }")
-*/
-        //def lightNames = lightsOn.collect { "${it.displayName} ➜ ${ getFormatted(state.lightsStates?.find { it.id.toString() == it.id.toString() }?.turnOffTime ) } " }.join(joinChars)
-def lightNames = lightsOn.collect {lightOn ->  "${lightOn.displayName} ➜ ${ getFormatted(state.lightsStates?.find { it.id.toString() == lightOn.id.toString() }?.turnOffTime ) ?: "" } " }.join(joinChars)
-//def matchingLights = lightsOn.collect { lightOn -> state.lightsStates.find { it.id == lightOn.id } }.findAll { it != null }
-
-
+        def lightNames = lightsOn.collect {lightOn ->  "${lightOn.displayName} ➜ ${ getFormatted(state.lightsStates?.find { it.id.toString() == lightOn.id.toString() }?.turnOffTime ) ?: "" } " }.join(joinChars)
         message += "\n${lightNames}"
         //messagelights += "\n${lightNames}"
     }
