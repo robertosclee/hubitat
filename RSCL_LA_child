@@ -424,6 +424,13 @@ def lightSwitchHandler(evt) //WHEN LIGHTS TURNED ON BY AUTOMATION OR MANUALLY
         state.skippedTurningOff = 0
     }    
 
+    if(deviceStatus == "off")
+    {
+        ldebug("lights off, removing ${device?.id}")
+        parent?.removeLightState(device?.id)
+    }
+
+
     state.turnedonmanually = false
 }
 
@@ -559,7 +566,7 @@ def motionHandler(evt)
     allLights().each { grp ->
         if(grp)
         {
-            ldebug("removeLightState ${grp.id}")
+            ldebug("no motion, removing state ${grp.id}")
             parent?.removeLightState(grp.id)
         }
     } 

@@ -361,7 +361,8 @@ def removeLightState(lightId)
     def updatedLightStates = s.findAll { it.id != lightId }
 
     state.lightsStates = updatedLightStates
-    ldebug("Removed light <b>${lightId}</b> from parent: \n${state.lightsStates}")
+
+    llog("Removed light <b>${lightId}</b>","Removed light <b>${lightId}</b> from parent: \n${state.lightsStates}")
 }
 
 def updateLightState(lightId, lightName, turnOffTime) 
@@ -372,7 +373,8 @@ def updateLightState(lightId, lightName, turnOffTime)
     if (existingLightState) 
     {
         existingLightState.turnOffTime = turnOffTime
-        ldebug("Updated light <b>${lightId}</b> states in parent: \n${state.lightsStates}")
+
+        llog("Updated light <b>${lightId}</b>","Updated light <b>${lightId}</b> states in parent: \n${state.lightsStates}")
     } 
     else 
     {
@@ -382,7 +384,7 @@ def updateLightState(lightId, lightName, turnOffTime)
             turnOffTime: turnOffTime
         ]
         s << newLightState
-        ldebug("Added light <b>${lightId}</b> states in parent: \n${state.lightsStates}")
+        llog("Added light <b>${lightId}</b>", "Added light <b>${lightId}</b> states in parent: \n${state.lightsStates}")
     }
     state.lightsStates = s
 }
@@ -407,10 +409,8 @@ def getCallMethod()
 }
 void sendLog(String message)
 {
-    setCallMethod("sendLog")
     if (sendMessageLog) 
     {
-        linfo(message)
         sendMessage(sendMessageLog, message)
     }
 }
@@ -452,6 +452,17 @@ void sendMessage(Object devices, String message, appName = "", methodName = "")
     {
         lwarn("No devices provided for sending message: ${message}")
     }    
+}
+def llog(infomessage, debugmessage)
+{
+    if(txtEnable)
+    {
+        linfo(infomessage)
+    }
+    if(logEnable)
+    {
+        ldebug(debugmessage)
+    }
 }
 def ldebug(message)
 {
