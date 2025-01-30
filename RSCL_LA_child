@@ -289,7 +289,13 @@ void installed()
 
 def initialize() 
 {
-    state.callMethod = "initialize"
+    if(aboutRoom)
+    {
+        setAppname(settings.aboutRoom)
+    }
+    
+    setCallMethod("initialize")
+
     linfo("initializing...")
     unschedule()
 	unsubscribe()
@@ -316,7 +322,7 @@ def initialize()
     linfo("ENABLED...")
 
     ldebug("subscribing ${location}")
-    subscribe(location, "mode", modeChangedHandler)
+    subscribe(location, "mode", modeHandler)
 
     ldebug("subscribing ${isDarkSwitch}")
     subscribe(isDarkSwitch, "switch", darkSwitchHandler)
@@ -339,9 +345,9 @@ def initialize()
     if(turnOnButtons)
     {
         ldebug("subscribing ${turnOnButtons}")
-        subscribe(sensor, "pushed", triggerLightsOnHandler)
-        subscribe(sensor, "doubleTapped", triggerLightsOnHandler)
-        subscribe(sensor, "held", triggerLightsOnHandler)
+        subscribe(sensor, "pushed", manualLightsOnHandler)
+        subscribe(sensor, "doubleTapped", manualLightsOnHandler)
+        subscribe(sensor, "held", manualLightsOnHandler)
 
         subscribe(turnOnButtons, "pushed", buttonTurnOnPushedHandler)
         subscribe(turnOnButtons, "doubleTapped", buttonTurnOnDoubleTappedHandler)
@@ -352,7 +358,7 @@ def initialize()
         if(grp.devices)
         {
             ldebug("subscribing ${grp.devices}")
-            subscribe(grp.devices, "switch", lightSwitchesHandler)
+            subscribe(grp.devices, "switch", lightSwitchHandler)
         }
     }
 
@@ -360,17 +366,17 @@ def initialize()
     {
         motionSensorsTurnOn.each { sensor ->
             ldebug("subscribing ${sensor}")
-            subscribe(sensor, "motion.active", triggerLightsOnHandler)            
-            subscribe(sensor, "motion.active", motionDetectedTurnOnHandler)
-            subscribe(sensor, "motion.inactive", motionStoppedTurnOnHandler)
+            //subscribe(sensor, "motion.active", manualLightsOnHandler)            
+            subscribe(sensor, "motion.active", motionTurnOnHandler)
+            subscribe(sensor, "motion.inactive", motionStopTurnOnHandler)
         }
     }
     if(motionSensorsKeepOn)
     {
         motionSensorsKeepOn.each { sensor ->
             ldebug("subscribing ${sensor}")
-            subscribe(sensor, "motion.active", motionDetectedKeepOnHandler)
-            subscribe(sensor, "motion.inactive", motionStoppedKeepOnHandler)
+            subscribe(sensor, "motion.active", motionKeepOnHandler)
+            subscribe(sensor, "motion.inactive", motionStopKeepOnHandler)
         }
     }
     ldebug ("events subscriptions added")
@@ -379,9 +385,9 @@ def initialize()
 }
 
 //EVENTS SUBSCRIPTIONS START
-def lightSwitchesHandler(evt) //WHEN LIGHTS TURNED ON BY AUTOMATION OR MANUALLY
+def lightSwitchHandler(evt) //WHEN LIGHTS TURNED ON BY AUTOMATION OR MANUALLY
 {
-    state.callMethod = "lightSwitchesHandler"
+    setCallMethod("lightSwitchHandler")
     def device = evt.device
     def deviceName = device.displayName
     def deviceStatus = evt.value
@@ -421,9 +427,9 @@ def lightSwitchesHandler(evt) //WHEN LIGHTS TURNED ON BY AUTOMATION OR MANUALLY
     state.turnedonmanually = false
 }
 
-def triggerLightsOnHandler(evt) 
+def manualLightsOnHandler(evt) 
 {
-    state.callMethod = "triggerLightsOnHandler"
+    setCallMethod("manualLightsOnHandler")
     def device = evt.device
     def deviceName = device.displayName
     def deviceStatus = evt.value
@@ -433,9 +439,9 @@ def triggerLightsOnHandler(evt)
     ldebug("lastautomation: ${state.lastautomation}, deviceName: ${deviceName}")       
 }
 
-def modeChangedHandler(evt) 
+def modeHandler(evt) 
 {
-    state.callMethod = "modeChangedHandler"
+    setCallMethod("modeHandler")
     state.modeJustChanged = true
     def newMode = evt.value
     linfo("Mode changed to ${newMode}")
@@ -465,7 +471,7 @@ def modeChangedHandler(evt)
 
 def luxChangedHandler(evt) 
 {
-    def callMethod = "luxChangedHandler"
+    setCallMethod("luxChangedHandler")
     /*
     def anylightson = isAnySwitchOn(mainlights)
     logdebug ("lux level ${evt?.displayName} (virt: ${isVirtual(evt?.device)}) changed to ${evt.value}, threshold is ${luxThreshold}, any lights on: ${anylightson}", "luxChangedHandler")
@@ -488,11 +494,11 @@ def luxChangedHandler(evt)
 
 def darkSwitchHandler(evt) 
 {
-    state.callMethod = "darkSwitchHandler"
+    setCallMethod("darkSwitchHandler")
     def device = evt.device
     def deviceName = device.displayName
     def deviceStatus = evt.value
-    linfo("darkSwitch ${deviceName} to ${deviceStatus}")
+    linfo("darkSwitch ${deviceName} to <b>${deviceStatus}</b>")
 
     if(isAnySwitchOn(allLights()))
     {
@@ -502,27 +508,27 @@ def darkSwitchHandler(evt)
 
 def roomDoorsHandler(evt) 
 {
-    state.callMethod = "roomDoorsHandler"
-    def device = evt.device
-    def deviceName = device.displayName
-    def deviceStatus = evt.value    
-    linfo("${deviceName} IS ${isContactOpen(device) ? "OPEN" : "DICHT"} : ${deviceStatus}")
-    //if(isContactOn(evt.device))
-    roomsHandler() 
+    doorHandler(evt, "roomDoorsHandler")
 }
 
 def houseDoorsHandler(evt) 
 {
-    state.callMethod = "houseDoorsHandler"
+    doorHandler(evt, "houseDoorsHandler")
+}
+
+def doorHandler(evt, m)
+{
+    setCallMethod("${m} > doorHandler")
     def device = evt.device
     def deviceName = device.displayName
     def deviceStatus = evt.value    
-    linfo("${deviceName} IS ${isContactOpen(device) ? "OPEN" : "DICHT"} : ${deviceStatus}")
+    ldebug("${deviceName} <b>${isContactOpen(device) ? "OPEN" : "DICHT"}</b> : <b>${deviceStatus}</b>")
     //if(isContactOn(evt.device))
-    roomsHandler() 
+    roomsHandler()     
 }
 
-def motionDetectedTurnOnHandler(evt) 
+
+def motionTurnOnHandler(evt) 
 {
     motionHandler(evt)
 
@@ -533,41 +539,50 @@ def motionDetectedTurnOnHandler(evt)
     }
 }
 
-def motionDetectedKeepOnHandler(evt)
+def motionKeepOnHandler(evt)
 {
     motionHandler(evt)
 }
 
 def motionHandler(evt)
 {
-    state.callMethod = "motionHandler"
+    setCallMethod("motionHandler")
     def device = evt.device
     def deviceName = device.displayName
     def deviceStatus = evt.value
     
-    linfo("motion ${deviceName} to ${deviceStatus}, ${ isAnySwitchOn(allLights()) ? "💡 keep on" : "💡 turn on accordingly" }")
+    ldebug("${deviceName} <b>${deviceStatus}</b>, 💡${ isAnySwitchOn(allLights()) ? "keep on" : "turn on accordingly" }")
     state.lastmotiondt = nowDt()
     state.lastmotionby = deviceName    
     unschedule()
+
+    allLights().each { grp ->
+        if(grp)
+        {
+            ldebug("removeLightState ${grp.id}")
+            parent?.removeLightState(grp.id)
+        }
+    } 
 
     // if(isAnySwitchOn(allLights())) //WILL THIS CAUSE TROUBLE?
     // {
     // }
 }
 
-def motionStoppedTurnOnHandler(evt) 
+def motionStopTurnOnHandler(evt) 
 {
-    motionStoppedReschedule(evt, "motionStoppedTurnOnHandler")
+    motionStopHandler(evt, "motionStopTurnOnHandler")
 }
 
-def motionStoppedKeepOnHandler(evt) 
+def motionStopKeepOnHandler(evt) 
 {
-    motionStoppedReschedule(evt, "motionStoppedKeepOnHandler")
+    motionStopHandler(evt, "motionStopKeepOnHandler")
 }
 
-def motionStoppedReschedule(evt, m)
+def motionStopHandler(evt, m)
 {
-    state.callMethod = "${m} > motionStoppedReschedule"
+    setCallMethod("${m} > motionStopHandler")
+
     def device = evt.device // The device that triggered the event
     def deviceName = device.displayName // Get the name of the light
     def deviceStatus = evt.value // Get the value (should be "off" in this case)    
@@ -576,7 +591,7 @@ def motionStoppedReschedule(evt, m)
     if(  isAnySwitchOn(allLights()) && !isAnyMotionActive(allMotionSensors()) )
     {
         // Use a set for faster lookup
-        def roomsWithMotionSensors = ["h", "lr", "mb", "k", "g", "o", "d"] as Set
+        def roomsWithMotionSensors = ["h", "lr", "mb", "k", "g", "o", "d", "test"] as Set
 
         if ( roomsWithMotionSensors.contains(aboutRoom) ) //ROOMS WITH MOTION SENSORS
         {
@@ -586,27 +601,31 @@ def motionStoppedReschedule(evt, m)
                 runIn(state.cfgStayon, checkMotionAndTurnOff)
                 state.turnofftime = addSecondsToNow(state.cfgStayon)
                 
-                /*
+                //parent?.state.lightsStates = [] //RESET FOR TEST PURPOSE
+                llog("planned off ${  getFormatted(state.turnofftime) }", "motion stop ${deviceName}, lights off in ${state.cfgStayon}s, ${  getFormatted(state.turnofftime) }")
                 allLights().each { grp ->
                     if(grp)
                     {
-                        //location.setVariable("turnofftime_${grp.id}", state.turnofftime)
+                        ldebug("updateLightState ${grp.id} ${grp.name} ${state.turnofftime}")
+                        parent?.updateLightState(grp.id, grp.name, state.turnofftime)
                     }
-                } 
-                */               
-                linfo("motion stopped ${deviceName}, lights off in ${state.cfgStayon}s at ${  state.turnofftime }")
+                }                     
             }    
             else
             {
-                //loginfo("state.stayon == ${state.stayon}", "motionStoppedKeepOnHandler")
+                //loginfo("state.stayon == ${state.stayon}", "motionStopKeepOnHandler")
             }
+        }
+        else
+        {
+            ldebug("aboutRoom ${aboutRoom} no logics in motionStopHandler")
         }
     }
 }
 
 def buttonTurnOnPushedHandler(evt)
 {
-    state.callMethod = "buttonTurnOnPushedHandler"
+    setCallMethod("buttonTurnOnPushedHandler")
     def device = evt.device
     def deviceName = device.displayName
     def deviceStatus = evt.value
@@ -623,7 +642,7 @@ def buttonTurnOnPushedHandler(evt)
 
 def buttonTurnOnHeldHandler(evt)
 {
-    state.callMethod = "buttonTurnOnHeldHandler"
+    setCallMethod("buttonTurnOnHeldHandler")
     def device = evt.device
     def deviceName = device.displayName
     def deviceStatus = evt.value
@@ -642,8 +661,9 @@ def buttonTurnOnHeldHandler(evt)
 //ACTIONS START
 void handleLightsBasedOnConfig(states, configs, lights)
 {
-    state.callMethod = "handleLightsBasedOnConfig"
-    ldebug("<code style='background-color: yellow'>${configs.base}</code>, values: ${configs.values}")
+    setCallMethod("handleLightsBasedOnConfig")
+    linfo("<code style='background-color: yellow'>${configs.base}</code>, values: ${configs.values}")
+    ldebug("values: ${configs.values}")
     addConfigItem(configs.base)
     if(configs.values && configs.values.do)
     {
@@ -668,7 +688,7 @@ void handleLightsBasedOnConfig(states, configs, lights)
 
 void turnOnLights(states, configs, lights, comment = "")
 {
-    state.callMethod = "turnOnLights"
+    setCallMethod("turnOnLights")
     state.cfgStayon = configs.values.stayon
 
     if(appEnabled)
@@ -723,7 +743,7 @@ void turnOnLights(states, configs, lights, comment = "")
 
 def turnOffAllLights(force = false) 
 {
-    state.callMethod = "turnOffAllLights"
+    setCallMethod("turnOffAllLights")
     //if(state.turnedonmanually && state.skippedTurningOff <= 10)
     if(state.turnedonmanually && !force) //TODO state name change?
 	{
@@ -744,7 +764,7 @@ def turnOffAllLights(force = false)
 
 def turnOffLights(lights) 
 {
-    state.callMethod = "turnOffLights"
+    setCallMethod("turnOffLights")
     if (!appEnabled) {
         linfo("TURN OFF LIGHTS NOT SUCCESSFUL, APP DISABLED")
         return
@@ -793,7 +813,7 @@ def turnOffLights(lights)
 
 def checkMotionAndTurnOff() 
 {
-    state.callMethod = "checkMotionAndTurnOff"
+    setCallMethod("checkMotionAndTurnOff")
     def currentMode = getMode()
     //ldebug(" [mb].contains(aboutRoom) : ${ ["mb"].contains(aboutRoom)}")
     //ldebug(" [SleepAll, SleepSome, SleepSomeEarlyWorkday].contains(currentMode) : ${["SleepAll", "SleepSome", "SleepSomeEarlyWorkday"].contains(currentMode)}")
@@ -828,14 +848,14 @@ def checkMotionAndTurnOff()
     */
     if (  !isAnyMotionActive(allMotionSensors()) ) 
     {
-        state.callMethod = "checkMotionAndTurnOff"
+        setCallMethod("checkMotionAndTurnOff")
         unschedule()
         linfo ("No motion, turning lights off and unschedule")    
         turnOffAllLights()
     }     
     else 
     {
-        state.callMethod = "checkMotionAndTurnOff"
+        setCallMethod("checkMotionAndTurnOff")
         unschedule()
         linfo ("Still motion, turning off rescheduled with ${state.cfgStayon}s")    
         runIn(state.cfgStayon, checkMotionAndTurnOff) // Check again after 1 minute if motion persists
@@ -852,10 +872,10 @@ def checkMotionAndTurnOff()
 //HANDLE ROOM START
 def roomsHandler()
 {
-    state.callMethod = "roomsHandler"
+    setCallMethod("roomsHandler")
     state.turnedonmanually = false
     
-    if(isAboutRoom("test")){ handleHallway() }
+    if(isAboutRoom("test")){ handleGeneral() }
     /*
     else if ( isAboutRoom("h") ) { handleHallway() }
     else if ( isAboutRoom("mb") ) { handleMasterBedroom() }
@@ -869,7 +889,7 @@ def roomsHandler()
 
 void settingsHandler(states)
 {
-    state.callMethod = "settingsHandler"
+    setCallMethod("settingsHandler")
     lightGroupArray().each { grp ->
         if(grp)
         {
@@ -882,7 +902,7 @@ void settingsHandler(states)
 
 void handleGeneral(manual = "")
 {
-    state.callMethod = "handleGeneral"
+    setCallMethod("handleGeneral")
     def states = allStates()
 
     if(states.isvalidmode)
@@ -915,7 +935,7 @@ void handleGeneral(manual = "")
 
 void handleSimpleMotion(manual = "") //LOW LIGHT AND MOTION ON OR OFF
 {
-    state.callMethod = "handleSimpleMotion"
+    setCallMethod("handleSimpleMotion")
     def currentMode = getMode()
     def states = allStates()
     
@@ -934,7 +954,7 @@ void handleSimpleMotion(manual = "") //LOW LIGHT AND MOTION ON OR OFF
 
 void handleSimpleDoor(manual = "") //CONTACT ON OR OFF
 {
-    state.callMethod = "handleSimpleDoor"
+    setCallMethod("handleSimpleDoor")
     def currentMode = getMode()
     def states = allStates()
    
@@ -970,7 +990,7 @@ void handleSimpleDoor(manual = "") //CONTACT ON OR OFF
 
 void appButtonHandler(String buttonName) 
 {
-    state.callMethod = "appButtonHandler"
+    setCallMethod("appButtonHandler")
     ldebug( "Button pressed: $buttonName")
     if (buttonName == "Save") 
     {
@@ -1004,7 +1024,7 @@ void appButtonHandler(String buttonName)
 
 def copyConfigurations() 
 {
-    state.callMethod = "copyConfigurations"
+    setCallMethod("copyConfigurations")
     if (sourceMode != targetMode) 
     {
             lightGroupArray().each { grp -> 
@@ -1032,7 +1052,7 @@ def copyConfigurations()
 
 def deleteConfigurations() 
 {
-    state.callMethod = "deleteConfigurations"
+    setCallMethod("deleteConfigurations")
     if (sourceMode != targetMode) 
     {
             lightGroupArray().each { grp -> 
@@ -1052,61 +1072,6 @@ def deleteConfigurations()
             }
         linfo("Configurations from target mode '${targetMode}' deleted.")
     } 
-}
-
-def ldebug(message)
-{
-	l(message, "", "debug")
-}
-def lwarn(message)
-{
-	l(message, "", "warn")
-}
-def lerror(message)
-{
-	l(message, "", "error")
-}
-def linfo(message)
-{
-	l(message, "", "info")
-}
-
-
-def l(message, logPostfix = "", logLevel = debug) 
-{
-    // Format the log message
-    if(logPostfix == "")
-    {
-        logPostfix = state.callMethod
-    }
-    
-    def logMessage = "[⚙️${settings.aboutRoom}] ${logPostfix} ➜ ${message}"
-
-    // Check if a log level is provided or use default
-    logLevel = logLevel ?: 'info'  // Default to 'info' if not provided
-
-    // Log based on the provided or default log level
-    switch(logLevel.toLowerCase()) 
-    {
-        case 'debug': 
-            if(parent?.logEnable)
-            {
-                log.debug logMessage
-            }
-            break
-        case 'warn':
-            log.warn "⚠️" + logMessage
-            break
-        case 'error':
-            log.error logMessage
-            break
-        default:
-            if(parent?.txtEnable)
-            {
-                log.info logMessage
-            }
-            break
-    }
 }
 
 def isAboutRoom(commadelimitedInput)
@@ -1188,7 +1153,7 @@ def getMode()
 
 def getConfig(modename, lightnameId, statenameId)
 {
-    state.callMethod = "getConfig"
+    setCallMethod("getConfig")
     def result = []
 
     if ([lightnameId, statenameId, modename].every { it != null }) 
@@ -1246,7 +1211,7 @@ def getConfig(modename, lightnameId, statenameId)
 
 def allStates()
 {
-    state.callMethod = "allStates"
+    setCallMethod("allStates")
     def currentmode = getMode()
     def includedModes = parent?.includedModes() ?: []
     def isConsideredDark = isSwitchOn(isDarkSwitch) || luxSensor?.currentIlluminance < luxThreshold
@@ -1328,7 +1293,7 @@ def isContactOpen(device)
 
 def isMotionActive(device) 
 {
-    state.callMethod = "isMotionActive"
+    //setCallMethod("isMotionActive")
     //ldebug("motion sensor ${device} is active? <b>${device.currentMotion == "active"}</b>")
     return device.currentMotion == "active"
 }
@@ -1356,55 +1321,9 @@ def getLatestStatesSortedByTime(devices, attribute) {
     return latestStates
 }
 
-def humanizeDatetime(inputTime) 
-{
-    state.callMethod = "humanizeDatetime"
-
-    if(isDate(inputTime))
-    {
-        try
-        {
-            def now = new Date()
-            def diff = now.time - inputTime.time
-
-            def seconds = diff / 1000
-            def minutes = seconds / 60
-            def hours = minutes / 60
-            def days = hours / 24
-            def months = days / 30
-            def years = days / 365
-
-            if(diff < 0)
-            {
-                //return "${diff}"            
-                def postfix = "to go"
-                if (seconds < 60) return "${-Math.round(seconds)} sec " + postfix
-            }
-            else
-            {
-                def postfix = "ago"
-                if (seconds < 60) return "${Math.round(seconds)} sec " + postfix
-                if (minutes < 60) return "${Math.round(minutes)} min " + postfix
-                if (hours < 24) return "${Math.round(hours)} hrs " + postfix
-                if (days < 30) return "${Math.round(days)} days " + postfix
-                if (months < 12) return "${Math.round(months)} months " + postfix
-                return "${Math.round(years)} years " + postfix
-            }
-        } catch (Exception e) {
-            log.error "General Exception caught: ${e.message}"
-            return "Err"
-        } 
-
-    }
-    else
-    {
-        return "N/A"
-    }
-}
-
 def isTimeBetween(timeStart, timeEnd) 
 {
-    state.callMethod = "isTimeBetween"
+    setCallMethod("isTimeBetween")
     def now = new Date()
     def start = parseTime(timeStart)
     def end = parseTime(timeEnd)
@@ -1421,7 +1340,7 @@ def isTimeBetween(timeStart, timeEnd)
 
 def parseTime(timeStr) 
 {
-    state.callMethod = "parseTime"
+    setCallMethod("parseTime")
     def timeParts = timeStr.split(':')
     def now = new Date()
     def result = new Date(now.year, now.month, now.date, timeParts[0].toInteger(), timeParts[1].toInteger())
@@ -1431,7 +1350,7 @@ def parseTime(timeStr)
 
 def hexToHSL(hex) 
 {
-    state.callMethod = "hexToHSL"
+    setCallMethod("hexToHSL")
 
     // Remove the # symbol if present
     hex = hex.replace("#", "")
@@ -1483,16 +1402,10 @@ def isString(value) {
     return value != null && value instanceof String
 }
 
-def isDate(input) {
-    return input instanceof Date
-}
-
 def addSecondsToNow(seconds, format = "yyyy-MM-dd'T'HH:mm:ss.SSS") 
 {
-    state.callMethod = "addSecondsToNow"
     def now = new Date()
     def newTime = new Date(now.time + (seconds * 1000))
-    ldebug("addSecondsToNow: ${seconds} seconds from now: ${newTime}")
     return newTime.format(format)
 }
 
@@ -1503,8 +1416,8 @@ def nowDt(format = "yyyy-MM-dd'T'HH:mm:ss.SSS")
 
 def parseToDate(dateString, format = "yyyy-MM-dd'T'HH:mm:ss.SSS") 
 {
-    state.callMethod = "parseToDate"
-    ldebug("parseToDate: ${dateString}")
+    //setCallMethod("parseToDate")
+    //ldebug("parseToDate: ${dateString}")
     return Date.parse(format, dateString)
 }
 
@@ -1515,46 +1428,24 @@ def calculateSecondsBetweenDates(Date startDate, Date endDate)
 
 def calculateMsBetweenDates(Date startDate, Date endDate) 
 {
-    state.callMethod = "calculateMsBetweenDates"
+    //setCallMethod("calculateMsBetweenDates")
     def differenceInMillis = endDate.time - startDate.time
-    ldebug("startDate: ${startDate}, endDate: ${endDate}, diff: ${differenceInMillis}")
+    //ldebug("startDate: ${startDate}, endDate: ${endDate}, diff: ${differenceInMillis}")
     return differenceInMillis
 }
 
-def retrieveDt(input, format = "yyyy-MM-dd'T'HH:mm:ss.SSS") 
-{
-    state.callMethod = "retrieveDt"
-    if (input) {
-        try {
-            def parsedDate = Date.parse(format, input)
-            //log.debug "Parsed Date from state[$key]: ${parsedDate}"
-            return parsedDate
-        } catch (Exception e) {
-            lerror("Failed to parse stored date from state[$key]: ${input}. Error: ${e.message}")
-            return null
-        }
-    } else {
-        lwarn("No date stored in ${input}")
-        return null
-    }
-}
 
+
+
+//PARENT WRAPPERS
 def getFormatted(input, format = "HH:mm:ss.SSS")
 {
-        def result = retrieveDt(input)
-        if(result)
-        {
-            return "${result.format(format)} (${humanizeDatetime(result)})" 
-        }
+    return parent?.getFormatted(input, format)
 }
 
-def getHumanize(key)
+def humanizeDatetime(inputTime) 
 {
-    def result = retrieveDate(key)
-    if(result)
-    {
-        return humanizeDatetime(result)
-    }
+    return parent?.humanizeDatetime(inputTime) 
 }
 
 String boolToOnOff(value = false) 
@@ -1593,45 +1484,56 @@ void addConfigItem(String configName)
     }
 }
 
+
+def setAppname(String str = null)
+{
+    state.appName = str
+}
+def getAppname()
+{
+    return state.appName
+}
+def setCallMethod(String str = null)
+{
+    state.callMethod = str
+}
+def getCallMethod()
+{
+    return state.callMethod
+}
+
+def llog(infomessage, debugmessage)
+{
+    if(parent?.txtEnable)
+    {
+        linfo(infomessage)
+    }
+    if(parent?.logEnable)
+    {
+        ldebug(debugmessage)
+    }
+}
+def ldebug(message)
+{
+    parent?.l(message, getAppname(), getCallMethod(), "debug")
+}
+def lwarn(message)
+{
+	parent?.l(message, getAppname(), getCallMethod(), "warn")
+}
+def lerror(message)
+{
+	parent?.l(message, getAppname(), getCallMethod(), "error")
+}
+def linfo(message)
+{
+	parent?.l(message, getAppname(), getCallMethod(), "info")
+}
 void sendLog(String message)
 {
-    state.callMethod = "sendLog"
-    if (parent?.sendMessageLog) 
-    {
-        sendMessage(parent?.sendMessageLog, message)
-    }
+    parent?.sendMessage( parent?.sendMessageLog, message, getAppname(), getCallMethod() )
 }
-
 void sendImportant(String message)
 {
-    state.callMethod = "sendImportant"
-    if (parent?.sendMessageImportant) 
-    {
-        sendMessage(parent?.sendMessageImportant, message)
-    }
-}
-
-//void sendMessage(Object inputObject, String message)
-void sendMessage(Object devices, String message)
-{
-    state.callMethod = devices?.id ?: "sendMessage"
-    if (devices) 
-    {
-        devices.each { device ->
-            if (device.hasCapability("Notification")) 
-            {
-                def msg = "[⚙️${settings.aboutRoom}] ➜ ${message}"
-                device.deviceNotification(msg)
-                //ldebug(msg)
-            }
-            else 
-            {
-                lwarn("Device ${device.displayName} does not support notifications")
-            }                     
-        }            
-    }
-    else 
-    {
-        lwarn("No devices provided for sending message: ${message}")
-    }    
+    parent?.sendMessage( parent?.sendMessageImportant, message, getAppname(), getCallMethod() )
 }

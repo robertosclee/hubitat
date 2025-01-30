@@ -17,7 +17,7 @@ preferences {
             input "txtEnable", "bool", title: "Descriptive logging?", defaultValue: true, required: true, width: 4
             input "logEnable", "bool", title: "Extensive (debug) logging?", required: true, width: 4
             input "sendMessageLog", "capability.notification", title: "Send log", multiple: true, required: false, width: 6
-            input "sendImportant", "capability.notification", title: "Send important phone notifications", multiple: true, required: false, width: 6                
+            input "sendMessageImportant", "capability.notification", title: "Send important phone notifications", multiple: true, required: false, width: 6                
         }       
         section("Wacther - settings") {
             input "groupChanges", "bool", title: "Group changes with a slight delay? Otherwise notify on every change", required: true, width: 4
@@ -47,62 +47,23 @@ preferences {
     }
 }
 
-def logwarn(message, methodName ="") 
-{
-    if(methodName != "")
-    {
-        state.logPostfix = methodName
-    }
-    log.warn "[⚙️${state.logPrefix}] ${state.logPostfix} ➜ ${message}"
-}
-
-
-def logdebug(message, methodName ="") 
-{
-    if(methodName != "")
-    {
-        state.logPostfix = methodName
-    }
-
-    if(logEnable)
-    {
-        log.debug "[⚙️${state.logPrefix}] ${state.logPostfix} ➜ ${message}"
-    }
-    
-}
-
-def loginfo(message, methodName ="") 
-{
-    if(methodName != "")
-    {
-        state.logPostfix = methodName
-    }
-
-    if(txtEnable)
-    {
-        log.info "[⚙️${state.logPrefix}] ${state.logPostfix} ➜ ${message}"
-    }
-}
-
-
 def installed() {
-    log.debug "Parent App Installed"
+    ldebug("Parent App Installed")
     initialize()
 }
 
 def updated() {
-    log.debug "Parent App Updated"
+    ldebug("Parent App Updated")
     initialize()
 }
 
 def initialize() 
 {
-    def callMethod = "initialize"
-    state.logPrefix = "watcher"
+    setAppname("watcher")
+    setCallMethod("initialize")
 
+    state.lightsStates = []
     state.selectedModes = settings.selectedModes ?: []
-
-
 
     unschedule()
 	unsubscribe()
@@ -124,30 +85,16 @@ def initialize()
     }
     if(manualLightsOffTrigger)
     {
-        loginfo("subscribe ${manualLightsOffTrigger}",callMethod)
+        linfo("subscribe ${manualLightsOffTrigger}")
         subscribe(manualLightsOffTrigger, "switch", manualLightsOffTriggerHandler)
     }
 
-    //runIn(1, checkStateAndNotify, [data: [source: 'initialize']])
+    //runIn(1, statusAndAlert, [data: [source: 'initialize']])
 
     // Schedule the check
     runIn(3, schedulerCheck)    
     
-    if (sendMessageLog) 
-    {
-        sendMessageLog.each { device ->
-            if (device.hasCapability("Notification")) {
-                device.deviceNotification("watcher engine restarted")
-                loginfo("watcher engine restarted",callMethod)
-            }
-            else 
-            {
-                logwarn("Device ${device.displayName} does not support notifications.",callMethod)
-            }                     
-        }            
-    }
-
-    log.debug "Watcher + Parent App Initialized"
+    sendLog("Watcher + Parent App Initialized")
 }
 
 // Method to get selected modes (accessible by child apps)
@@ -169,18 +116,12 @@ def includedModes(curMode)
 
 
 
-
-
-
-
-
-
 //WATCHER
 
 def modeChangeHandler(evt) 
 {
-    def callMethod = "modeChangeHandler"
-    logdebug("Mode changed to: ${evt.value}",callMethod)
+    setCallMethod("modeChangeHandler")
+    ldebug("Mode changed to: ${evt.value}")
     sendImportant.deviceNotification("Mode changed to: ${evt.value}\n#watcher")
     if ( ["SleepAll", "SleepSome"].contains(location.mode) )
     {
@@ -196,11 +137,11 @@ def modeChangeHandler(evt)
 
 def manualLightsOffTriggerHandler(evt) 
 {
-    def callMethod = "manualLightsOffTriggerHandler"
+    setCallMethod("manualLightsOffTriggerHandler")
 
     if(evt.value == "on")
     {
-        logdebug("All lights off triggered: ${evt.device}",callMethod)
+        ldebug("All lights off triggered: ${evt.device}")
         if (["SleepAll", "SleepSome"].contains(location.mode))
         {
             def excludePartialNames = ["kids"]
@@ -217,99 +158,111 @@ def manualLightsOffTriggerHandler(evt)
 
 def appButtonHandler(buttonName) 
 {
-    def callMethod = "appButtonHandler"
-    logdebug("Button pressed: ${buttonName}", callMethod)
+    setCallMethod("appButtonHandler")
+    ldebug("Button pressed: ${buttonName}")
     if (buttonName == "testButton") 
     {
-        runIn(1, checkStateAndNotify, [data: [source: 'test']])
+        runIn(1, statusAndAlert, [data: [source: 'test']])
     }
 }
 
 def manualCheckHandler(evt) 
 {
-    def callMethod = "manualCheckHandler"
+    setCallMethod("manualCheckHandler")
     if(evt.value == "on")
     {
-        runIn(3, checkStateAndNotify, [data: [source: callMethod]])    
+        runIn(3, statusAndAlert, [data: [source: getCallMethod()]])    
     }
 }
 
 def motionHandler(evt) 
 {
-    def callMethod = "motionHandler"
-    logdebug("Motion: ${evt.displayName} is ${evt.value}",callMethod)
-    //runIn(10, checkStateAndNotify, [data: [source: callMethod]])
+    //setCallMethod("manualCheckHandler")
+    //ldebug("Motion: ${evt.displayName} is ${evt.value}")
+    //runIn(10, statusAndAlert, [data: [source: callMethod]])
 }
 
 def lightsChangeHandler(evt) 
 {
-    def callMethod = "lightsChangeHandler"
+    setCallMethod("lightsChangeHandler")
     
-    logdebug("Light changed: ${evt.displayName} is ${evt.value}",callMethod)
+    //ldebug("Light changed: ${evt.displayName} is ${evt.value}")
     if(groupChanges)
     {
-        runIn(8, checkStateAndNotify, [data: [source: callMethod]])    
+        runIn(8, statusAndAlert, [data: [source: callMethod]])    
     }    
     else
     {
-        sendMessageLog.deviceNotification("${evt.value == "off" ? "❌" : ""} ${evt.displayName}")
+        sendLog("${evt.value == "off" ? "❌" : ""} ${evt.displayName}")
     }
 }
 
 def doorsChangeHandler(evt) 
 {
-    def callMethod = "doorsChangeHandler"
+    setCallMethod("doorsChangeHandler")
     
-    logdebug("Door changed: ${evt.displayName} is ${evt.value}",callMethod)
+    ldebug("Door changed: ${evt.displayName} is ${evt.value}")
     if(groupChanges)
     {
-        runIn(1, checkStateAndNotify, [data: [source: callMethod]])    
+        runIn(1, statusAndAlert, [data: [source: callMethod]])    
     }    
     else
     {
-        sendMessageLog.deviceNotification("${evt.value == "off" ? "❌" : ""} ${evt.displayName}")
+        sendLog("${evt.value == "off" ? "❌" : ""} ${evt.displayName}")
     }
 }
 
 def schedulerCheck(data) 
 {
-    def callMethod = "schedulerCheck"
+    setCallMethod("schedulerCheck")
     def source = data?.source ?: "unknown"    
 
     unschedule()
-    runIn(3, checkStateAndNotify, [data: [source: callMethod]])
-    //runIn(60*runInMinutes, schedulerCheck) //EVERY 15 MIN
-    runIn(60*runInMinutes, schedulerCheck, [data: [source: callMethod]]) //EVERY 15 MIN
-    logdebug("watcher reschedule", callMethod)
+    runIn(3, statusAndAlert, [data: [source: getCallMethod()]])
+    runIn(60*runInMinutes, schedulerCheck, [data: [source: getCallMethod()]]) //EVERY 15 MIN
+    ldebug("watcher reschedule")
 }
 
-def checkStateAndNotify(data) 
+def statusAndAlert(data) 
 {
-    def callMethod = "checkStateAndNotify"
+    setCallMethod("statusAndAlert")
     
     def source = data?.source ?: "unknown"
-    //log.debug "checkStateAndNotify called by: ${source}"
+    ldebug("statusAndAlert called by: ${source}")
     
     def lightsOn = lights ? lights.findAll { it.currentSwitch == "on" }.sort { a, b -> a.displayName <=> b.displayName } : []
     def openDoors = doors ? doors.findAll { it.currentContact == "open" }.sort { a, b -> a.displayName <=> b.displayName } : []
     def motionActive = motionsensors ? motionsensors.findAll { it.currentMotion == "active" }.sort { a, b -> a.displayName <=> b.displayName } : []
 
     def message = "💡:${lightsOn.size()}/${lights.size()} 🚪:${openDoors.size()}/${doors.size()} 👋:${motionActive.size()}/${motionsensors.size()}"
-    loginfo(message, callMethod)
-
+    //linfo(message)
+//ldebug(lightsOn[0])
 /*
     atomicState.each { key, value ->
-        logdebug("atomicState[${key}] = ${value}")
+        ldebug("atomicState[${key}] = ${value}")
     }    
 */
-    //logdebug("<b>location.getVariable ${location.getVariable("turnofftime_40")}</b>")
+    //ldebug("<b>location.getVariable ${location.getVariable("turnofftime_40")}</b>")
     //def messagedoors = "🚪:${openDoors.size()}"
     //def messagelights = "💡:${lightsOn.size()}"
     //def messagemotions = "👋:${motionNames.size()}"
-    def joinChars = " "
+    def joinChars = "\n"
     if (lightsOn) 
     {
-        def lightNames = lightsOn.collect { it.displayName }.join(joinChars)
+        ldebug("state.lightsStates = ${state.lightsStates}")
+        ldebug("lightsOn: ${lightsOn}")
+        ldebug("lightsOn.collect = ${lightsOn.collect { it.id } }")
+/*
+        
+        ldebug("state.lightsStates.collect = ${state.lightsStates.collect { it.id } }")
+        ldebug("state.lightsStates.collect = ${state.lightsStates.collect { it.id.class } }")
+        ldebug("state.lightsStates.find = ${state.lightsStates.find {  it.id.toString() == "40" } }")
+*/
+        //def lightNames = lightsOn.collect { "${it.displayName} ➜ ${ getFormatted(state.lightsStates?.find { it.id.toString() == it.id.toString() }?.turnOffTime ) } " }.join(joinChars)
+def lightNames = lightsOn.collect {lightOn ->  "${lightOn.displayName} ➜ ${ getFormatted(state.lightsStates?.find { it.id.toString() == lightOn.id.toString() }?.turnOffTime ) ?: "" } " }.join(joinChars)
+//def matchingLights = lightsOn.collect { lightOn -> state.lightsStates.find { it.id == lightOn.id } }.findAll { it != null }
+
+
         message += "\n${lightNames}"
         //messagelights += "\n${lightNames}"
     }
@@ -344,80 +297,52 @@ def checkStateAndNotify(data)
 
         
         def urgentText = ""
-        def doLog = false
 
-        if (sendImportant) 
-        {
-            def doNotifyImportant = false
-            
-            // Notify if source is manualCheckHandler
-            if (source == "manualCheckHandler") {
-                doNotifyImportant = true
-            }
-
-            // Notify if last check had something on or open, even if nothing is on or open now
-            if (state.somethingwasonoropen && (lightsOn.size() == 0 && openDoors.size() == 0)) {
-                doNotifyImportant = true
-            }
-
-            if(
-                ( location.mode == "Away" && (lightsOn.size() > 0 || openDoors.size() > 0 || motionActive.size() > 0 ) )
-                ||
-                ( ["SleepAll", "Away"].contains(location.mode) && openDoors.size() > 0 )
-            )
-            {
-                doNotifyImportant = true
-                urgentText = "\nMODE: ${location.mode.toUpperCase()}, BUT"
-            }   
-
-            if (doNotifyImportant) 
-            {
-                doLog = true
-                state.somethingwasonoropen = false
-                sendImportant.each { device ->
-                    if (device.hasCapability("Notification")) 
-                    {
-                        device.deviceNotification("${urgentText}${message}")
-                        logdebug("important: ${urgentText}${message}",callMethod)
-                    }
-                    else 
-                    {
-                        logwarn("Device ${device.displayName} does not support notifications.",callMethod)
-                    }                     
-                }
-            }    
-
-            // Update state for next check
-            state.somethingwasonoropen = (lightsOn.size() > 0 || openDoors.size() > 0)                    
-        }
+        def doNotifyImportant = false
         
-        if (sendMessageLog || doLog) 
-        {
-            //log.debug "sendMessageLog"
-            //sendMessageLog.deviceNotification(message)
-            sendMessageLog.each { device ->
-                if (device.hasCapability("Notification")) {
-                    device.deviceNotification("${urgentText}${message}")
-                    logdebug("log: ${urgentText}${message}",callMethod)
-                }
-                else 
-                {
-                    logwarn("Device ${device.displayName} does not support notifications.",callMethod)
-                }                     
-            }            
+        // Notify if source is manualCheckHandler
+        if (source == "manualCheckHandler") {
+            doNotifyImportant = true
         }
 
+        // Notify if last check had something on or open, even if nothing is on or open now
+        if (state.somethingwasonoropen && (lightsOn.size() == 0 && openDoors.size() == 0)) {
+            doNotifyImportant = true
+        }
 
+        if(
+            ( location.mode == "Away" && (lightsOn.size() > 0 || openDoors.size() > 0 || motionActive.size() > 0 ) )
+            ||
+            ( ["SleepAll", "Away"].contains(location.mode) && openDoors.size() > 0 )
+        )
+        {
+            doNotifyImportant = true
+            urgentText = "\nMODE: ${location.mode.toUpperCase()}, BUT"
+        }   
 
+        if (doNotifyImportant) 
+        {
+            state.somethingwasonoropen = false
+            sendImportant("${urgentText}${message}")
+        }   
+        else
+        {
+            sendLog("${urgentText}${message}")
+        } 
 
-    }  else {
-        loginfo("No lights on or doors open.",callMethod)
+        // Update state for next check
+        state.somethingwasonoropen = (lightsOn.size() > 0 || openDoors.size() > 0)                    
+       
+    }  
+    else 
+    {
+        linfo("No lights on or doors open.")
     }
 }
 
 def turnOffLightsExcept(triggerMethod, excludePartialNames = []) 
 {
-    def callMethod = "turnOffLightsExcept"
+    setCallMethod("turnOffLightsExcept")
     
     def lightsOn = lights ? lights.findAll { 
         it.currentSwitch == "on" && 
@@ -425,24 +350,249 @@ def turnOffLightsExcept(triggerMethod, excludePartialNames = [])
     }.sort { a, b -> a.displayName <=> b.displayName } : []
     
     def lightsOnNames = lightsOn.collect { it.displayName }.join(", ")
-    def exceptNames = excludePartialNames.size > 0 ? ", except ${excludePartialNames.collect { it }.join(", ")}" : ""
+    def exceptNames = excludePartialNames.size > 0 ? ", skipping ${excludePartialNames.collect { it }.join(", ")}" : ""
 
     if (lightsOn.size() == 0) 
     {
-        loginfo("No lights to turn off in house${exceptNames} #${triggerMethod}",callMethod)
-        sendImportant.deviceNotification("No lights to turn off in house${exceptNames}\n#watcher #${triggerMethod}")
-        sendMessageLog.deviceNotification("No lights to turn off in house${exceptNames}\n#watcher #${triggerMethod}")
+        sendImportant("No lights to turn off in house${exceptNames}\n#watcher #${triggerMethod}")
         return
     }
     else
     {
-        loginfo("Turning off ${lightsOn.size} of ${lights.size()} lights in house${exceptNames} #${triggerMethod}",callMethod) 
-        sendImportant.deviceNotification("Turning off ${lightsOn.size} of ${lights.size()} lights in house${exceptNames}\n${lightsOnNames}\n#watcher #${triggerMethod}")    
-        sendMessageLog.deviceNotification("Turning off ${lightsOn.size} of ${lights.size()} lights in house${exceptNames}\n${lightsOnNames}\n#watcher #${triggerMethod}")
+        sendImportant("Turning off ${lightsOn.size} of ${lights.size()} lights in house${exceptNames}\n${lightsOnNames}\n#watcher #${triggerMethod}")
         lightsOn.each { light ->
-            logdebug("Turning off ${light.displayName}\n#${triggerMethod}",callMethod)
+            linfo("Turning off ${light.displayName}\n#${triggerMethod}")
             light.off() 
         } 
     }
     
+}
+
+def removeLightState(lightId) 
+{
+    def s = state.lightsStates ?: []
+    def updatedLightStates = s.findAll { it.id != lightId }
+
+    state.lightsStates = updatedLightStates
+    ldebug("Removed light <b>${lightId}</b> from parent: \n${state.lightsStates}")
+}
+
+def updateLightState(lightId, lightName, turnOffTime) 
+{
+    def s = state.lightsStates ?: []
+    def existingLightState = s.find { it.id == lightId }
+
+    if (existingLightState) 
+    {
+        existingLightState.turnOffTime = turnOffTime
+        ldebug("Updated light <b>${lightId}</b> states in parent: \n${state.lightsStates}")
+    } 
+    else 
+    {
+        def newLightState = [
+            id: lightId,
+            name: lightName,
+            turnOffTime: turnOffTime
+        ]
+        s << newLightState
+        ldebug("Added light <b>${lightId}</b> states in parent: \n${state.lightsStates}")
+    }
+    state.lightsStates = s
+}
+
+
+
+def setAppname(String str = null)
+{
+    state.appName = str
+}
+def getAppname()
+{
+    return state.appName
+}
+def setCallMethod(String str = null)
+{
+    state.callMethod = str
+}
+def getCallMethod()
+{
+    return state.callMethod
+}
+void sendLog(String message)
+{
+    setCallMethod("sendLog")
+    if (sendMessageLog) 
+    {
+        linfo(message)
+        sendMessage(sendMessageLog, message)
+    }
+}
+void sendImportant(String message)
+{
+    if (sendMessageImportant) 
+    {
+        sendMessage(sendMessageImportant, message)
+        sendLog(message) //ALWAYS SEND LOG ALSO
+    }
+}
+void sendMessage(Object devices, String message, appName = "", methodName = "")
+{
+    if(appName == "")
+    {
+        appName = getAppname()
+    }    
+    if(methodName == "")
+    {
+        methodName = getCallMethod()
+    }
+
+    if (devices) 
+    {
+        devices.each { device ->
+            if (device.hasCapability("Notification")) 
+            {
+                def msg = "[⚙️${appName}] ➜ ${message}"
+                device.deviceNotification(msg)
+                //ldebug(msg)
+            }
+            else 
+            {
+                lwarn("Device ${device.displayName} does not support notifications")
+            }                     
+        }            
+    }
+    else 
+    {
+        lwarn("No devices provided for sending message: ${message}")
+    }    
+}
+def ldebug(message)
+{
+	l(message,"","", "debug")
+}
+def lwarn(message)
+{
+	l(message,"","", "warn")
+}
+def lerror(message)
+{
+	l(message,"","", "error")
+}
+def linfo(message)
+{
+	l(message,"","", "info")
+}
+def l(message, appName = "", methodName = "", logLevel = debug) 
+{
+    if(appName == "")
+    {
+        appName = getAppname()
+    }    
+    if(methodName == "")
+    {
+        methodName = getCallMethod()
+    }
+    
+    def logMessage = "[⚙️${appName}] ${methodName} ➜ ${message}"
+
+    // Check if a log level is provided or use default
+    logLevel = logLevel ?: 'info'  // Default to 'info' if not provided
+
+    // Log based on the provided or default log level
+    switch(logLevel.toLowerCase()) 
+    {
+        case 'debug': 
+            if(logEnable)
+            {
+                log.debug logMessage
+            }
+            break
+        case 'warn':
+            log.warn "⚠️" + logMessage
+            break
+        case 'error':
+            log.error logMessage
+            break
+        default:
+            if(txtEnable)
+            {
+                log.info logMessage
+            }
+            break
+    }
+}
+
+def humanizeDatetime(inputTime) 
+{
+    if(isDate(inputTime))
+    {
+        try
+        {
+            def now = new Date()
+            def diff = now.time - inputTime.time
+
+            def seconds = diff / 1000
+            def minutes = seconds / 60
+            def hours = minutes / 60
+            def days = hours / 24
+            def months = days / 30
+            def years = days / 365
+
+            if(diff < 0)
+            {
+                //return "${diff}"            
+                def postfix = "to go"
+                if (seconds < 60) return "${-Math.round(seconds)} sec " + postfix
+            }
+            else
+            {
+                def postfix = "ago"
+                if (seconds < 60) return "${Math.round(seconds)} sec " + postfix
+                if (minutes < 60) return "${Math.round(minutes)} min " + postfix
+                if (hours < 24) return "${Math.round(hours)} hrs " + postfix
+                if (days < 30) return "${Math.round(days)} days " + postfix
+                if (months < 12) return "${Math.round(months)} months " + postfix
+                return "${Math.round(years)} years " + postfix
+            }
+        } catch (Exception e) {
+            log.error "General Exception caught: ${e.message}"
+            return "Err"
+        } 
+
+    }
+    else
+    {
+        return "N/A"
+    }
+}
+
+def retrieveDt(input, format = "yyyy-MM-dd'T'HH:mm:ss.SSS") 
+{
+    //setCallMethod("retrieveDt")
+    if (input) {
+        try {
+            def parsedDate = Date.parse(format, input)
+            //log.debug "Parsed Date from state[$key]: ${parsedDate}"
+            return parsedDate
+        } catch (Exception e) {
+            lerror("Failed to parse stored date from state[$key]: ${input}. Error: ${e.message}")
+            return null
+        }
+    } else {
+        lwarn("No date stored in ${input}")
+        return null
+    }
+}
+
+def getFormatted(input, format = "HH:mm:ss.SSS")
+{
+        def result = retrieveDt(input)
+        if(result)
+        {
+            return "${result.format(format)} (${humanizeDatetime(result)})" 
+        }
+}
+
+def isDate(input) {
+    return input instanceof Date
 }
