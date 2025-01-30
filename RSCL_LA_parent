@@ -249,7 +249,7 @@ def statusAndAlert(data)
     def joinChars = "\n"
     if (lightsOn) 
     {
-        def lightNames = lightsOn.collect {lightOn ->  "${lightOn.displayName} ➜ ${ getFormatted(state.lightsStates?.find { it.id.toString() == lightOn.id.toString() }?.turnOffTime ) ?: "" } " }.join(joinChars)
+        def lightNames = lightsOn.collect {lightOn -> "${lightOn.displayName} ⏳ ${ getFormatted(state.lightsStates?.find { it.id.toString() == lightOn.id.toString() }?.turnOffTime ) ?: "" } " }.join(joinChars)
         message += "\n${lightNames}"
         //messagelights += "\n${lightNames}"
     }
