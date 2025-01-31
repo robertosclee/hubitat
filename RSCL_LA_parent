@@ -193,7 +193,7 @@ def lightsChangeHandler(evt)
     }    
     else
     {
-        sendLog("${evt.value == "off" ? "❌" : ""} ${evt.displayName}")
+        //sendLog("${evt.value == "off" ? "❌" : ""} ${evt.displayName}")
     }
 }
 
@@ -208,7 +208,7 @@ def doorsChangeHandler(evt)
     }    
     else
     {
-        sendLog("${evt.value == "off" ? "❌" : ""} ${evt.displayName}")
+        //sendLog("${evt.value == "off" ? "❌" : ""} ${evt.displayName}")
     }
 }
 
@@ -440,7 +440,7 @@ void sendMessage(Object devices, String message, appName = "", methodName = "")
             {
                 def msg = "[⚙️${appName}] ➜ ${message}"
                 device.deviceNotification(msg)
-                //ldebug(msg)
+                l(msg, appName, methodName, "debug")
             }
             else 
             {

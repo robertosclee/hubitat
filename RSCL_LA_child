@@ -89,7 +89,7 @@ if(allMotionSensors())
 prefixInfo += "<br/>Any lights on: <b>${isAnySwitchOn(allLights())}</b>"
 if(isAnySwitchOn(allLights()))        
 {
-    prefixInfo += ", turning off at ${state.turnofftime > nowDt() ? getFormatted(state.turnofftime) : ""}, stayon: ${state.cfgStayon}s"
+    prefixInfo += ", turning off at ${state.turnofftime > nowDtStr() ? getFormatted(state.turnofftime) : ""}, stayon: ${state.cfgStayon}s"
     prefixInfo += ", was turned on manually <b>${state.turnedonmanually}</b> and has been skipped <b>${skippedTurningOff}</b> times"
 }
         
@@ -384,6 +384,7 @@ def initialize()
     sendLog("App is initialized")
 }
 
+
 //EVENTS SUBSCRIPTIONS START
 def lightSwitchHandler(evt) //WHEN LIGHTS TURNED ON BY AUTOMATION OR MANUALLY
 {
@@ -396,20 +397,24 @@ def lightSwitchHandler(evt) //WHEN LIGHTS TURNED ON BY AUTOMATION OR MANUALLY
     //DETERMINE IF LIGHTS ARE TURNED ON MANUALLY
     if(deviceStatus == "on" && enableManual)
     {
-        def thresholdDetermineIfAutomation = 10000 //MS
-        def elapsedTime = calculateMsBetweenDates(parseToDate(state.lastautomation), new Date())
+        def thresholdDetermineIfAutomation = 1000 //MS
+        ldebug("last automation (${atomicState.automationLightsOn}) and now ${new Date().time}")
+        def elapsedTime = new Date().time - atomicState.automationLightsOn
+        def elapsedTimeInSeconds = elapsedTime / (1000)
         def elapsedTimeInMinutes = elapsedTime / (1000) / 60
-        ldebug("elapsedTime since last automation (${state.lastautomation}): ${elapsedTime}ms, likely ${  elapsedTime > thresholdDetermineIfAutomation ? "manually" : "automation"  } = ${elapsedTimeInMinutes}min")
 
+        ldebug("elapsed ms: ${elapsedTime}, sec : ${elapsedTimeInSeconds} , min: ${elapsedTimeInMinutes}")
+        //ldebug("elapsedTime since last automation (${state.atomicState.automationLightsOn}) and now ${nowDt()}: ${elapsedTime}ms, likely ${  elapsedTime > thresholdDetermineIfAutomation ? "manually" : "automation"  } = ${elapsedTimeInMinutes}min")
+        def logElapsed = "${elapsedTime}ms (elapsed) > ${thresholdDetermineIfAutomation}ms (threshold)"
         if(elapsedTime > thresholdDetermineIfAutomation)
         {
-            sendLog("manually via voice/button, elapsedTime (${elapsedTime}) > threshold (${thresholdDetermineIfAutomation})")
+            sendLog("manually via voice/button, ${logElapsed}")
             state.turnedonmanually = true
             state.skippedTurningOff = 0
         }
         else
         {
-            sendLog("automated, elapsedTime (${elapsedTime}) < threshold (${thresholdDetermineIfAutomation})")
+            sendLog("automated, ${logElapsed}")
         }
     }
     else
@@ -430,8 +435,12 @@ def lightSwitchHandler(evt) //WHEN LIGHTS TURNED ON BY AUTOMATION OR MANUALLY
         parent?.removeLightState(device?.id)
     }
 
-
-    state.turnedonmanually = false
+    if(!enableManual)
+    {
+        state.turnedonmanually = false
+        state.skippedTurningOff = 0
+    }
+    
 }
 
 def manualLightsOnHandler(evt) 
@@ -441,9 +450,6 @@ def manualLightsOnHandler(evt)
     def deviceName = device.displayName
     def deviceStatus = evt.value
     def deviceClass = evt.class
-    
-    state.lastautomation = nowDt()
-    ldebug("lastautomation: ${state.lastautomation}, deviceName: ${deviceName}")       
 }
 
 def modeHandler(evt) 
@@ -559,7 +565,7 @@ def motionHandler(evt)
     def deviceStatus = evt.value
     
     ldebug("${deviceName} <b>${deviceStatus}</b>, 💡${ isAnySwitchOn(allLights()) ? "keep on" : "turn on accordingly" }")
-    state.lastmotiondt = nowDt()
+    state.lastmotiondt = nowDtStr()
     state.lastmotionby = deviceName    
     unschedule()
 
@@ -700,6 +706,10 @@ void turnOnLights(states, configs, lights, comment = "")
 
     if(appEnabled)
     {
+        //THIS IS IMPORTANT HERE. JUST BEFORE TURNING THE LIGHTS ON
+        atomicState.automationLightsOn = new Date().time
+        ldebug("atomicState.automationLightsOn: ${atomicState.automationLightsOn}")       
+
         lights.each { light ->
                 if( configs.values.turnon ) //|| !isAnySwitchOn(allLights())
                 {
@@ -751,25 +761,16 @@ void turnOnLights(states, configs, lights, comment = "")
 def turnOffAllLights(force = false) 
 {
     setCallMethod("turnOffAllLights")
-    //if(state.turnedonmanually && state.skippedTurningOff <= 10)
-    if(state.turnedonmanually && !force) //TODO state name change?
-	{
-        state.skippedTurningOff += 1
-        ldebug("Skip turn off, was manually turned on, skipped turning off: ${state.skippedTurningOff}")
-        sendLog("skipped turned off, manually turned on: ${state.turnedonmanually}")
-    }
-    else
-    {
-        allLights().each { grp ->
-            if(grp)
-            {
-                turnOffLights(grp) 
-            }
+
+    allLights().each { grp ->
+        if(grp)
+        {
+            turnOffLights(grp) 
         }
     }
 }
 
-def turnOffLights(lights) 
+def turnOffLights(lights, force = false) 
 {
     setCallMethod("turnOffLights")
     if (!appEnabled) {
@@ -785,9 +786,22 @@ def turnOffLights(lights)
     if (isAnySwitchOn(lights)) 
     {
         linfo("Turning off ${lights} lights")
-        lights.off()
-        sendLog("Turned off")
-    } else {
+
+        //if(state.turnedonmanually && state.skippedTurningOff <= 10)
+        if(state.turnedonmanually && !force) //TODO state name change?
+        {
+            state.skippedTurningOff += 1
+            //ldebug("Skip turn off, was manually turned on, skipped turning off: ${state.skippedTurningOff}")
+            sendLog("${lights} not off, skipped, was manually turned on: ${state.turnedonmanually}")
+        }
+        else
+        {
+            lights.off()
+            sendLog("${lights} off")
+        }
+    } 
+    else 
+    {
         linfo("Lights ${lights} already off")
     }    
     /*
@@ -1416,10 +1430,19 @@ def addSecondsToNow(seconds, format = "yyyy-MM-dd'T'HH:mm:ss.SSS")
     return newTime.format(format)
 }
 
-def nowDt(format = "yyyy-MM-dd'T'HH:mm:ss.SSS")
+
+
+def nowDt()
+{
+    //return new Date()
+    return new Date().time 
+}
+
+def nowDtStr(format = "yyyy-MM-dd'T'HH:mm:ss.SSS")
 {
     return new Date().format(format)
 }
+
 
 def parseToDate(dateString, format = "yyyy-MM-dd'T'HH:mm:ss.SSS") 
 {
@@ -1428,17 +1451,17 @@ def parseToDate(dateString, format = "yyyy-MM-dd'T'HH:mm:ss.SSS")
     return Date.parse(format, dateString)
 }
 
-def calculateSecondsBetweenDates(Date startDate, Date endDate) 
+def calculateSecondsBetweenDates(Long startDate, Long endDate) 
 {
     return calculateMsBetweenDates(startDate, endDate) / 1000
 }
 
-def calculateMsBetweenDates(Date startDate, Date endDate) 
+def calculateMsBetweenDates(Long startDate, Long endDate) 
 {
     //setCallMethod("calculateMsBetweenDates")
-    def differenceInMillis = endDate.time - startDate.time
+    def differenceInMs = endDate - startDate
     //ldebug("startDate: ${startDate}, endDate: ${endDate}, diff: ${differenceInMillis}")
-    return differenceInMillis
+    return differenceInMs
 }
 
 
@@ -1482,7 +1505,7 @@ void addConfigItem(String configName)
     state.usedConfigHistory = state.usedConfigHistory ?: []
     
     // Add the new item to the top of the list with a timestamp
-    def newItem = [name: configName, time: nowDt()]
+    def newItem = [name: configName, time: nowDtStr()]
     state.usedConfigHistory.add(0, newItem)
     
     // Ensure the list only keeps the last 5 items
