@@ -409,12 +409,14 @@ def lightSwitchHandler(evt) //WHEN LIGHTS TURNED ON BY AUTOMATION OR MANUALLY
         if(elapsedTime > thresholdDetermineIfAutomation)
         {
             sendLog("manually via voice/button, ${logElapsed}")
-            state.turnedonmanually = true
             state.skippedTurningOff = 0
+            state.turnedonmanually = true
+            parent?.updateLightState(device?.id, null, true)
         }
         else
         {
             sendLog("automated, ${logElapsed}")
+            parent?.updateLightState(device?.id, null, false)
         }
     }
     else
@@ -425,20 +427,23 @@ def lightSwitchHandler(evt) //WHEN LIGHTS TURNED ON BY AUTOMATION OR MANUALLY
             sendLog("Turned manually is false again. Lights automation is active again")
         }
 
-        state.turnedonmanually = false
         state.skippedTurningOff = 0
+        state.turnedonmanually = false
+        parent?.updateLightState(device?.id, null, false)
     }    
 
     if(deviceStatus == "off")
     {
-        ldebug("lights off, removing ${device?.id}")
-        parent?.removeLightState(device?.id)
+        ldebug("lights off")
+        //parent?.removeLightState(device?.id)
+        //parent?.updateLightState(device?.id, null, null)
     }
 
     if(!enableManual)
     {
-        state.turnedonmanually = false
         state.skippedTurningOff = 0
+        state.turnedonmanually = false
+        parent?.updateLightState(device?.id, null, false)
     }
     
 }
@@ -569,13 +574,14 @@ def motionHandler(evt)
     state.lastmotionby = deviceName    
     unschedule()
 
-    allLights().each { grp ->
-        if(grp)
-        {
-            ldebug("no motion, removing state ${grp.id}")
-            parent?.removeLightState(grp.id)
-        }
-    } 
+    // allLights().each { grp ->
+    //     if(grp)
+    //     {
+    //         ldebug("no motion, removing state ${grp.id}")
+    //         //parent?.removeLightState(grp.id)
+    //         //parent?.updateLightState(grp.id, )
+    //     }
+    // } 
 
     // if(isAnySwitchOn(allLights())) //WILL THIS CAUSE TROUBLE?
     // {
@@ -620,7 +626,8 @@ def motionStopHandler(evt, m)
                     if(grp)
                     {
                         ldebug("updateLightState ${grp.id} ${grp.name} ${state.turnofftime}")
-                        parent?.updateLightState(grp.id, grp.name, state.turnofftime)
+                        //parent?.updateLightState(grp.id, grp.name, state.turnofftime)
+                        parent?.updateLightState(grp.id, state.turnofftime, null)
                     }
                 }                     
             }    
@@ -895,6 +902,7 @@ def roomsHandler()
 {
     setCallMethod("roomsHandler")
     state.turnedonmanually = false
+    parent?.updateLightState(device?.id, null, false)
     
     if(isAboutRoom("test")){ handleGeneral() }
     /*
