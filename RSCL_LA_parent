@@ -1,3 +1,5 @@
+import java.text.SimpleDateFormat
+
 definition(
     name: "Lights Automations V1",
     namespace: "RSCL_LA",
@@ -19,15 +21,16 @@ preferences {
             input "sendMessageLog", "capability.notification", title: "Send log", multiple: true, required: false, width: 6
             input "sendMessageImportant", "capability.notification", title: "Send important phone notifications", multiple: true, required: false, width: 6                
         }       
-        section("Wacther - settings") {
+        section("Watcher - settings") {
             input "groupChanges", "bool", title: "Group changes with a slight delay? Otherwise notify on every change", required: true, width: 4
         }         
-        section("Wacther - Select Devices to Monitor") {
+        section("Watcher - Select Devices to Monitor") {
             input "lights", "capability.switch", title: "Which lights?", multiple: true, required: false, width: 4
             input "doors", "capability.contactSensor", title: "Which doors?", multiple: true, required: false, width: 4
             input "motionsensors", "capability.motionSensor", title: "Which motion sensors?", multiple: true, required: false, width: 4
+            input "notifyOnMinutes", "number", title: "Notify if light is longer on then n minutes", required: true, defaultValue: 15, width: 12
         }
-        section("Wacther - Manual Triggers") {
+        section("Watcher - Manual Triggers") {
             input "manualLightsOffTrigger", "capability.switch", title: "All lights off trigger", multiple: false, required: true, width: 4
             input "manualCheckTrigger", "capability.switch", title: "Manual Motion Check Trigger", required: false, width: 4
             input "runInMinutes", "number", title: "Check every n minutes", required: true, defaultValue: 15, width: 4
@@ -93,6 +96,9 @@ def initialize()
 
     // Schedule the check
     runIn(3, schedulerCheck)    
+
+    // Schedule periodic check every minute
+    runIn(3, checkLightStatus)    
     
     sendLog("Watcher + Parent App Initialized")
 }
@@ -114,7 +120,40 @@ def includedModes(curMode)
 }
 
 
+def checkLightStatus() 
+{
+    setCallMethod("checkLightStatus")
+    ldebug("---- checkLightStatus")
+    if(isAnySwitchOn(lights))
+    {
+        lights.each { l ->
+            if(l)
+            {
+                def lightStatus = l.latestState("switch")  // Get the latest switch state
+                def lightEventDate = lightStatus?.date  // Get the timestamp of the latest event                
+//                ldebug("chk ${l.id} ${l.name} :  ${lightStatus.value} since ${lightEventDate}")
+                if (lightEventDate && lightStatus.value == "on") 
+                {
+                    def elapsedTime = new Date().time - lightEventDate.time  // Time difference in milliseconds
+                    def elapsedTimeInSeconds = elapsedTime / (1000)
+                    def elapsedTimeInMinutes = elapsedTime / (1000) / 60                    
+                    ldebug("chk ${l.id} ${l.name} :  ${lightStatus.value} since ${lightEventDate} = ${elapsedTime}")
+                    if (elapsedTime > (notifyOnMinutes * 60000))  {  // 10 minutes = 600000 milliseconds
+                        ldebug("Light ${l.name} has been on for ${elapsedTimeInMinutes} minutes = ${lightEventDate.time}")
+                        sendImportant("Light ${l.name} has been on for ${elapsedTimeInMinutes} minutes!")
+                       
+                    }
+                }
 
+            }
+        }        
+    }
+    else
+    {
+        ldebug("no check, light off already")
+    }
+    runIn(60*15, checkLightStatus)    
+}
 
 //WATCHER
 
@@ -122,7 +161,7 @@ def modeChangeHandler(evt)
 {
     setCallMethod("modeChangeHandler")
     ldebug("Mode changed to: ${evt.value}")
-    sendImportant.deviceNotification("Mode changed to: ${evt.value}\n#watcher")
+    sendImportant("Mode changed to: ${evt.value}\n#watcher")
     if ( ["SleepAll", "SleepSome"].contains(location.mode) )
     {
         def excludePartialNames = ["kids"]
@@ -407,7 +446,13 @@ def updateLightState(lightId, turnOffTime = null, manuallyOn = null)
     state.lightsStates = s
 }
 
+def isAnySwitchOn(devices)
+{
+    //if(devices == null) return false
 
+    def anyOn = devices.find { it?.currentValue("switch") == "on" }
+    return anyOn != null
+}
 
 def setAppname(String str = null)
 {
@@ -611,4 +656,9 @@ def getFormatted(input, format = "HH:mm:ss.SSS")
 
 def isDate(input) {
     return input instanceof Date
+}
+
+def parseDateString(dateString) {
+    def dateFormat = new SimpleDateFormat("EEE MMM dd HH:mm:ss z yyyy")
+    return dateFormat.parse(dateString)
 }

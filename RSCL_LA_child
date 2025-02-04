@@ -381,8 +381,14 @@ def initialize()
     }
     ldebug ("events subscriptions added")
 
+
+
     sendLog("App is initialized")
 }
+
+
+
+
 
 
 //EVENTS SUBSCRIPTIONS START
