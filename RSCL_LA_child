@@ -398,11 +398,12 @@ def lightSwitchHandler(evt) //WHEN LIGHTS TURNED ON BY AUTOMATION OR MANUALLY
     def device = evt.device
     def deviceName = device.displayName
     def deviceStatus = evt.value
-    linfo("${deviceName} to <b>${deviceStatus}</b>")
+    
 
     //DETERMINE IF LIGHTS ARE TURNED ON MANUALLY
     if(deviceStatus == "on" && enableManual)
     {
+        ldebug("${deviceName} to <b>${deviceStatus}</b>")
         def thresholdDetermineIfAutomation = 1000 //MS
         ldebug("last automation (${atomicState.automationLightsOn}) and now ${new Date().time}")
         def elapsedTime = new Date().time - atomicState.automationLightsOn
@@ -414,23 +415,23 @@ def lightSwitchHandler(evt) //WHEN LIGHTS TURNED ON BY AUTOMATION OR MANUALLY
         def logElapsed = "${elapsedTime}ms (elapsed) > ${thresholdDetermineIfAutomation}ms (threshold)"
         if(elapsedTime > thresholdDetermineIfAutomation)
         {
-            sendLog("manually via voice/button, ${logElapsed}")
+            sendLog("🫴 ${logElapsed}")
             state.skippedTurningOff = 0
             state.turnedonmanually = true
             parent?.updateLightState(device?.id, null, true)
         }
         else
         {
-            sendLog("automated, ${logElapsed}")
+            sendLog("⚙️ ${logElapsed}")
             parent?.updateLightState(device?.id, null, false)
         }
     }
     else
     {
-        ldebug("device ${deviceName} to ${deviceStatus}, automation is active")
+        ldebug("device ${deviceName} to ${deviceStatus}, automation active again")
         if(state.turnedonmanually)
         {
-            sendLog("Turned manually is false again. Lights automation is active again")
+            sendLog("Turned manually is false again. Lights automation active again")
         }
 
         state.skippedTurningOff = 0
@@ -575,7 +576,8 @@ def motionHandler(evt)
     def deviceName = device.displayName
     def deviceStatus = evt.value
     
-    ldebug("${deviceName} <b>${deviceStatus}</b>, 💡${ isAnySwitchOn(allLights()) ? "keep on" : "turn on accordingly" }")
+    //ldebug("${deviceName} <b>${deviceStatus}</b>, 💡${ isAnySwitchOn(allLights()) ? "keep on" : "turn on accordingly" }")
+    ldebug("${deviceName} <b>${deviceStatus}</b>")
     state.lastmotiondt = nowDtStr()
     state.lastmotionby = deviceName    
     unschedule()
@@ -736,13 +738,13 @@ void turnOnLights(states, configs, lights, comment = "")
                             def hsl = hexToHSL(configs.values.color)
                             light.setColor([hue: hsl.hue, saturation: hsl.saturation, level: configs.values.brightness])
                             linfo ("${light.displayName} ON, COLOR: ${hsl}")
-                            sendLog("${light.displayName} ON, following color settings ${hsl}")
+                            sendLog("${light.displayName} ON, color settings ${hsl}")
                         }
                         else
                         {
                             light.setLevel(configs.values.brightness)
                             linfo ("${light.displayName} ON, LEVEL: ${configs.values.brightness}%")
-                            sendLog("${light.displayName} ON, following brightness settings ${configs.values.brightness}%")
+                            sendLog("${light.displayName} ON, brightness settings ${configs.values.brightness}%")
                         }
                     }
                     else
