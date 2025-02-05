@@ -3,7 +3,7 @@ definition(
     namespace: "RSCL_LA",
     parent: "RSCL_LA:Lights Automations V1",
     author: "Roberto Lee",
-    description: "A parent app that creates and manages child apps.",
+    description: "A child app that creates and manages child apps.",
     category: "Convenience",
     iconUrl: "",
     iconX2Url: "",
