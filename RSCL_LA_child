@@ -3,7 +3,7 @@ definition(
     namespace: "RSCL_LA",
     parent: "RSCL_LA:Lights Automations V1",
     author: "Roberto Lee",
-    description: "A child app that creates and manages child apps.",
+    description: "A child app for lights automation.",
     category: "Convenience",
     iconUrl: "",
     iconX2Url: "",
@@ -13,8 +13,6 @@ definition(
 preferences {
     page(name: "mainPage", title: "RSCL Child App Configuration", install: true, uninstall: true) 
 }
-
-
 
 Map mainPage() {
 	dynamicPage(name: "mainPage", title: "", uninstall: true, install: true) {
@@ -85,7 +83,6 @@ if(allMotionSensors())
     prefixInfo += "<br/>Last motion: ${getFormatted(state.lastmotiondt)} by ${state.lastmotionby}"
     prefixInfo += "<br/>Any motion: <b>${isAnyMotionActive(allMotionSensors())}</b>"
 }
-
 
 prefixInfo += "<br/>Any lights on: <b>${isAnySwitchOn(allLights())}</b>"
 if(isAnySwitchOn(allLights()))        
@@ -196,8 +193,7 @@ section("DEVICES", hideable: true, hidden: false)
                         {
                             devicesRelatedToGrp = "<span class='yellow'>${grp.description} = ${grp.devices.collect { it.currentValue("level") + "%" }.join(", ")}</span>"
                         }
-                        
-                        
+             
                         if(devicesRelatedToGrp)
                         {
                             paragraph "<u>${devicesRelatedToGrp}</u><br/>"
@@ -213,7 +209,6 @@ section("DEVICES", hideable: true, hidden: false)
                             }                
                         }
                     }
-
 
                 }
                 input name: "Save", type: "button", title: "Save", submitOnChange: true, width: 1  
@@ -381,16 +376,8 @@ def initialize()
         }
     }
     ldebug ("events subscriptions added")
-
-
-
     sendLog("App is initialized")
 }
-
-
-
-
-
 
 //EVENTS SUBSCRIPTIONS START
 def lightSwitchHandler(evt) //WHEN LIGHTS TURNED ON BY AUTOMATION OR MANUALLY
@@ -432,7 +419,7 @@ def lightSwitchHandler(evt) //WHEN LIGHTS TURNED ON BY AUTOMATION OR MANUALLY
         ldebug("device ${deviceName} to ${deviceStatus}, automation active again")
         if(state.turnedonmanually)
         {
-            sendLog("Turned manually is false again. Lights automation active again")
+            linfo("Turned manually is false again. Lights automation active again")
         }
 
         state.skippedTurningOff = 0
@@ -739,19 +726,19 @@ void turnOnLights(states, configs, lights, comment = "")
                             def hsl = hexToHSL(configs.values.color)
                             light.setColor([hue: hsl.hue, saturation: hsl.saturation, level: configs.values.brightness])
                             linfo ("${light.displayName} ON, COLOR: ${hsl}")
-                            sendLog("${light.displayName} ON, color settings ${hsl}")
+                            sendLog("${light.displayName} ON, color ${hsl}")
                         }
                         else
                         {
                             light.setLevel(configs.values.brightness)
                             linfo ("${light.displayName} ON, LEVEL: ${configs.values.brightness}%")
-                            sendLog("${light.displayName} ON, brightness settings ${configs.values.brightness}%")
+                            sendLog("${light.displayName} ON, brightness ${configs.values.brightness}%")
                         }
                     }
                     else
                     {
                         linfo ("${light.displayName} ON, NO CHANGE SETTING ${light.displayName} [${configs.do}], ${comment}")
-                        sendLog("${light.displayName} ON, not following settings")
+                        sendLog("${light.displayName} ON, no settings used")
                         light.on()
                     }
                 }
@@ -808,7 +795,7 @@ def turnOffLights(lights, force = false)
         {
             state.skippedTurningOff += 1
             //ldebug("Skip turn off, was manually turned on, skipped turning off: ${state.skippedTurningOff}")
-            sendLog("${lights} not off, skipped, was manually turned on: ${state.turnedonmanually}")
+            sendLog("${lights} not off, skipped, was manually turned")
         }
         else
         {
@@ -820,69 +807,13 @@ def turnOffLights(lights, force = false)
     {
         linfo("Lights ${lights} already off")
     }    
-    /*
-    if(appEnabled)
-    {
-        if(lights)
-        {
-            if(isAnySwitchOn(lights))
-            {
-                linfo ("Turning off ${lights} lights")
-                lights?.off()
-                sendLog("turned off")
-            }
-            else
-            {
-                linfo ("Lights ${lights} already off")
-            }
-        }
-        else
-        {
-            linfo ("Turning off ${lights} lights not successful")   
-        }
-    }
-    else
-    {
-        linfo("TURN OFF LIGHTS NOT SUCCESSFUL, APP DISABLED")
-    }
-    */
 }
 
 def checkMotionAndTurnOff() 
 {
     setCallMethod("checkMotionAndTurnOff")
     def currentMode = getMode()
-    //ldebug(" [mb].contains(aboutRoom) : ${ ["mb"].contains(aboutRoom)}")
-    //ldebug(" [SleepAll, SleepSome, SleepSomeEarlyWorkday].contains(currentMode) : ${["SleepAll", "SleepSome", "SleepSomeEarlyWorkday"].contains(currentMode)}")
-    //ldebug("state.turnedonmanually : ${state.turnedonmanually } and isAnyMotionActive(motionSensorsTurnOn) : ${isAnyMotionActive(motionSensorsTurnOn)}")
     
-    /*
-    if( ["mb"].contains(aboutRoom)
-        && ["SleepAll", "SleepSome", "SleepSomeEarlyWorkday"].contains(currentMode) 
-        && !state.turnedonmanually 
-        && !isAnyMotionActive(motionSensorsTurnOn)
-        )    
-    {
-        state.callMethod = "checkMotionAndTurnOff"
-        unschedule()
-        linfo ("Room ${aboutRoom} and sleeping, ignore keep on and turn off lights")    
-        turnOffAllLights()
-    }    
-    else if (  !isAnyMotionActive(allMotionSensors()) ) 
-    {
-        state.callMethod = "checkMotionAndTurnOff"
-        unschedule()
-        linfo ("No motion, turning lights off and unschedule")    
-        turnOffAllLights()
-    }     
-    else 
-    {
-        state.callMethod = "checkMotionAndTurnOff"
-        unschedule()
-        linfo ("Still motion, turning off rescheduled with ${state.cfgStayon}s")    
-        runIn(state.cfgStayon, checkMotionAndTurnOff) // Check again after 1 minute if motion persists
-    }
-    */
     if (  !isAnyMotionActive(allMotionSensors()) ) 
     {
         setCallMethod("checkMotionAndTurnOff")

@@ -2,7 +2,7 @@ definition(
     name: "Lights Automations V1",
     namespace: "RSCL_LA",
     author: "Roberto Lee",
-    description: "A parent app that creates and manages child apps.",
+    description: "A parent app monitor lights, doors and motion.",
     category: "Convenience",
     iconUrl: "",
     iconX2Url: "",
@@ -37,11 +37,6 @@ preferences {
         section("Actions:") {
             input name: "Save", type: "button", title: "Save", submitOnChange: true
         }            
-        /*
-        section("Mode Selection") {
-            input "includedModes", "mode", title: "Applicable modes", multiple: true, required: false, width: 6
-        }        
-        */
         section("ROOMS:") 
         {
             app(name: "myChildApps", appName: "Lights Automations V1 Child", namespace: "RSCL_LA", title: "Add room", multiple: true)
@@ -116,11 +111,7 @@ def includedModes(curMode)
     return selectedModes ?: []
 }
 
-
-
-
 //WATCHER
-
 def modeChangeHandler(evt) 
 {
     setCallMethod("modeChangeHandler")
@@ -264,11 +255,11 @@ def statusAndAlert(data)
             {
                 def elapsedTime = new Date().time - lightEventDate.time  // Time difference in milliseconds
                 def elapsedTimeInSeconds = elapsedTime / (1000)
-                def elapsedTimeInMinutes = elapsedTime / (1000) / 60     
+                def elapsedTimeInMinutes = Math.round(elapsedTime / (1000) / 60)
                 if (elapsedTime > (notifyOnMinutes * 60000))    // 1 minutes = 60000 milliseconds                               
                 {
-                    ldebug("Light ${lightOn.name} has been on for ${elapsedTimeInMinutes} minutes = ${lightEventDate.time}")
-                    sendImportant("Light ${lightOn.name} has been on for ${Math.round(elapsedTimeInMinutes)} minutes!")
+                    ldebug("${lightOn.name} has been on for ${elapsedTimeInMinutes} minutes = ${lightEventDate.time}")
+                    sendImportant("${lightOn.name} has been on for ${elapsedTimeInMinutes} minutes!")
                 }
             }
 
@@ -381,18 +372,6 @@ def turnOffLightsExcept(triggerMethod, excludePartialNames = [])
     
 }
 
-/*
-def removeLightState(lightId) 
-{
-    def s = state.lightsStates ?: []
-    def updatedLightStates = s.findAll { it.id != lightId }
-
-    state.lightsStates = updatedLightStates
-
-    llog("Removed light <b>${lightId}</b>","Removed light <b>${lightId}</b> from parent: \n${state.lightsStates}")
-}
-*/
-
 def updateLightState(lightId, turnOffTime = null, manuallyOn = null) 
 {
     def s = state.lightsStates ?: []
@@ -410,8 +389,6 @@ def updateLightState(lightId, turnOffTime = null, manuallyOn = null)
             existingLightState.turnOffTime = turnOffTime
             llog("Updated light <b>${lightId}</b> with manuallyOn: ${manuallyOn}","Updated light <b>${lightId}</b> states in parent: \n${state.lightsStates}")
         }
-
-        
     } 
     else 
     {
@@ -534,7 +511,7 @@ def l(message, appName = "", methodName = "", logLevel = debug)
         methodName = getCallMethod()
     }
     
-    def logMessage = "[⚙️${appName}] ${methodName} ➜ ${message}"
+    def logMessage = "[${appName}] ${methodName} ➜ ${message}"
 
     // Check if a log level is provided or use default
     logLevel = logLevel ?: 'info'  // Default to 'info' if not provided
