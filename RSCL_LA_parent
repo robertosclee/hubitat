@@ -1,5 +1,3 @@
-import java.text.SimpleDateFormat
-
 definition(
     name: "Lights Automations V1",
     namespace: "RSCL_LA",
@@ -227,43 +225,6 @@ def schedulerCheck(data)
     runIn(60*runInMinutes, schedulerCheck, [data: [source: getCallMethod()]]) //EVERY 15 MIN
     ldebug("watcher reschedule")
 }
-/*
-def checkLightStatus(data) 
-{
-    setCallMethod("checkLightStatus")
-    ldebug("---- checkLightStatus")
-    if(isAnySwitchOn(lights))
-    {
-        lights.each { l ->
-            if(l)
-            {
-                def lightStatus = l.latestState("switch")  // Get the latest switch state
-                def lightEventDate = lightStatus?.date  // Get the timestamp of the latest event                
-//                ldebug("chk ${l.id} ${l.name} :  ${lightStatus.value} since ${lightEventDate}")
-                if (lightEventDate && lightStatus.value == "on") 
-                {
-                    def elapsedTime = new Date().time - lightEventDate.time  // Time difference in milliseconds
-                    def elapsedTimeInSeconds = elapsedTime / (1000)
-                    def elapsedTimeInMinutes = elapsedTime / (1000) / 60                    
-                    ldebug("chk ${l.id} ${l.name} :  ${lightStatus.value} since ${lightEventDate} = ${elapsedTime}")
-                    if (elapsedTime > (notifyOnMinutes * 60000))  {  // 10 minutes = 600000 milliseconds
-                        ldebug("Light ${l.name} has been on for ${elapsedTimeInMinutes} minutes = ${lightEventDate.time}")
-                        sendImportant("Light ${l.name} has been on for ${elapsedTimeInMinutes} minutes!")
-                       
-                    }
-                }
-
-            }
-        }        
-    }
-    else
-    {
-        ldebug("no check, light off already")
-    }
-    runIn(60*15, checkLightStatus)    
-}
-*/
-
 
 def statusAndAlert(data) 
 {
@@ -304,10 +265,10 @@ def statusAndAlert(data)
                 def elapsedTime = new Date().time - lightEventDate.time  // Time difference in milliseconds
                 def elapsedTimeInSeconds = elapsedTime / (1000)
                 def elapsedTimeInMinutes = elapsedTime / (1000) / 60     
-                if (elapsedTime > (notifyOnMinutes * 60000))  {  // 1 minutes = 60000 milliseconds                               
+                if (elapsedTime > (notifyOnMinutes * 60000))    // 1 minutes = 60000 milliseconds                               
                 {
                     ldebug("Light ${lightOn.name} has been on for ${elapsedTimeInMinutes} minutes = ${lightEventDate.time}")
-                    sendImportant("Light ${lightOn.name} has been on for ${elapsedTimeInMinutes} minutes!")
+                    sendImportant("Light ${lightOn.name} has been on for ${Math.round(elapsedTimeInMinutes)} minutes!")
                 }
             }
 
@@ -675,9 +636,4 @@ def getFormatted(input, format = "HH:mm:ss.SSS")
 
 def isDate(input) {
     return input instanceof Date
-}
-
-def parseDateString(dateString) {
-    def dateFormat = new SimpleDateFormat("EEE MMM dd HH:mm:ss z yyyy")
-    return dateFormat.parse(dateString)
 }
