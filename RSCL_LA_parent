@@ -8,6 +8,7 @@ definition(
     category: "Convenience",
     iconUrl: "",
     iconX2Url: "",
+    importUrl: "https://raw.githubusercontent.com/robertosclee/hubitat/refs/heads/main/RSCL_LA_parent",
     singleInstance: true
 )
 
@@ -94,12 +95,10 @@ def initialize()
 
     //runIn(1, statusAndAlert, [data: [source: 'initialize']])
 
-    // Schedule the check
+    // Schedule the checks
     runIn(3, schedulerCheck)    
 
-    // Schedule periodic check every minute
-    runIn(3, checkLightStatus)    
-    
+   
     sendLog("Watcher + Parent App Initialized")
 }
 
@@ -120,40 +119,7 @@ def includedModes(curMode)
 }
 
 
-def checkLightStatus() 
-{
-    setCallMethod("checkLightStatus")
-    ldebug("---- checkLightStatus")
-    if(isAnySwitchOn(lights))
-    {
-        lights.each { l ->
-            if(l)
-            {
-                def lightStatus = l.latestState("switch")  // Get the latest switch state
-                def lightEventDate = lightStatus?.date  // Get the timestamp of the latest event                
-//                ldebug("chk ${l.id} ${l.name} :  ${lightStatus.value} since ${lightEventDate}")
-                if (lightEventDate && lightStatus.value == "on") 
-                {
-                    def elapsedTime = new Date().time - lightEventDate.time  // Time difference in milliseconds
-                    def elapsedTimeInSeconds = elapsedTime / (1000)
-                    def elapsedTimeInMinutes = elapsedTime / (1000) / 60                    
-                    ldebug("chk ${l.id} ${l.name} :  ${lightStatus.value} since ${lightEventDate} = ${elapsedTime}")
-                    if (elapsedTime > (notifyOnMinutes * 60000))  {  // 10 minutes = 600000 milliseconds
-                        ldebug("Light ${l.name} has been on for ${elapsedTimeInMinutes} minutes = ${lightEventDate.time}")
-                        sendImportant("Light ${l.name} has been on for ${elapsedTimeInMinutes} minutes!")
-                       
-                    }
-                }
 
-            }
-        }        
-    }
-    else
-    {
-        ldebug("no check, light off already")
-    }
-    runIn(60*15, checkLightStatus)    
-}
 
 //WATCHER
 
@@ -261,6 +227,43 @@ def schedulerCheck(data)
     runIn(60*runInMinutes, schedulerCheck, [data: [source: getCallMethod()]]) //EVERY 15 MIN
     ldebug("watcher reschedule")
 }
+/*
+def checkLightStatus(data) 
+{
+    setCallMethod("checkLightStatus")
+    ldebug("---- checkLightStatus")
+    if(isAnySwitchOn(lights))
+    {
+        lights.each { l ->
+            if(l)
+            {
+                def lightStatus = l.latestState("switch")  // Get the latest switch state
+                def lightEventDate = lightStatus?.date  // Get the timestamp of the latest event                
+//                ldebug("chk ${l.id} ${l.name} :  ${lightStatus.value} since ${lightEventDate}")
+                if (lightEventDate && lightStatus.value == "on") 
+                {
+                    def elapsedTime = new Date().time - lightEventDate.time  // Time difference in milliseconds
+                    def elapsedTimeInSeconds = elapsedTime / (1000)
+                    def elapsedTimeInMinutes = elapsedTime / (1000) / 60                    
+                    ldebug("chk ${l.id} ${l.name} :  ${lightStatus.value} since ${lightEventDate} = ${elapsedTime}")
+                    if (elapsedTime > (notifyOnMinutes * 60000))  {  // 10 minutes = 600000 milliseconds
+                        ldebug("Light ${l.name} has been on for ${elapsedTimeInMinutes} minutes = ${lightEventDate.time}")
+                        sendImportant("Light ${l.name} has been on for ${elapsedTimeInMinutes} minutes!")
+                       
+                    }
+                }
+
+            }
+        }        
+    }
+    else
+    {
+        ldebug("no check, light off already")
+    }
+    runIn(60*15, checkLightStatus)    
+}
+*/
+
 
 def statusAndAlert(data) 
 {
@@ -290,26 +293,42 @@ def statusAndAlert(data)
     {
         //def lightNames = lightsOn.collect {lightOn -> "${lightOn.displayName} ⏳ ${ getFormatted(state.lightsStates?.find { it.id.toString() == lightOn.id.toString() }?.turnOffTime ) ?: "" } " }.join(joinChars)
         def lightNames = lightsOn.collect { lightOn ->
+            
             def lightState = state.lightsStates?.find { it.id.toString() == lightOn.id.toString() }
             def turnOffTimeFormatted = getFormatted(lightState?.turnOffTime) ?: ""
             def manuallyOnFormatted = lightState?.manuallyOn ? "🫴" : "⚙️"
+
+            def lightEventDate = lightOn.latestState("switch")?.date
+            if(lightEventDate)
+            {
+                def elapsedTime = new Date().time - lightEventDate.time  // Time difference in milliseconds
+                def elapsedTimeInSeconds = elapsedTime / (1000)
+                def elapsedTimeInMinutes = elapsedTime / (1000) / 60     
+                if (elapsedTime > (notifyOnMinutes * 60000))  {  // 1 minutes = 60000 milliseconds                               
+                {
+                    ldebug("Light ${lightOn.name} has been on for ${elapsedTimeInMinutes} minutes = ${lightEventDate.time}")
+                    sendImportant("Light ${lightOn.name} has been on for ${elapsedTimeInMinutes} minutes!")
+                }
+            }
+
             return "${lightOn.displayName} ${turnOffTimeFormatted} ${manuallyOnFormatted}" 
         }.join(joinChars)
 
         message += "\n${lightNames}"
-        //messagelights += "\n${lightNames}"
+        
+        //EXTRA NOTIFICATION IN LIGHTS ARE LONG ON
+
+
     }
     if (openDoors) 
     {
         def doorNames = openDoors.collect { it.displayName }.join(joinChars)
         message += "\n${doorNames}"
-        //messagedoors += "\n${doorNames}"
     }
     if (motionActive && ["SleepAll", "Away"].contains(location.mode) ) 
     {
         def motionNames = motionActive.collect { it.displayName }.join(joinChars)
         message += "\n${motionNames}"
-        //messagemotions += "\n${motionNames}"
     }    
 
     if (message) 
