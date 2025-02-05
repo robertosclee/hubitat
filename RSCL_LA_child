@@ -6,7 +6,8 @@ definition(
     description: "A parent app that creates and manages child apps.",
     category: "Convenience",
     iconUrl: "",
-    iconX2Url: ""
+    iconX2Url: "",
+    importUrl: "https://raw.githubusercontent.com/robertosclee/hubitat/refs/heads/main/RSCL_LA_child"
 )
 
 preferences {
