@@ -317,76 +317,147 @@ def initialize()
 
     linfo("ENABLED...")
 
-    ldebug("subscribing ${location}")
+    subscribeToAll()
+
+
+    ldebug ("events subscriptions added")
+    sendLog("App is initialized")
+}
+
+def subscribeToEssentials() 
+{
+    ldebug("subscribing essentials")
+
+    unsubscribe()
+
     subscribe(location, "mode", modeHandler)
 
-    ldebug("subscribing ${isDarkSwitch}")
-    subscribe(isDarkSwitch, "switch", darkSwitchHandler)
-
-    if(luxSensor)
-    {
-        ldebug("subscribing ${luxSensor}")
-        subscribe(luxSensor, "illuminance", luxChangedHandler)
+    lightGroupArray().each { grp -> 
+        if(grp.devices)
+        {
+            ldebug("-subscribing ${grp.devices}")
+            subscribe(grp.devices, "switch", lightSwitchHandler)
+        }
     }    
-    if(roomDoors)
-    {
-        ldebug("subscribing ${roomDoors}")
-        subscribe(roomDoors, "contact", roomDoorsHandler)
-    }
-    if(houseDoors)
-    {
-        ldebug("subscribing ${houseDoors}")
-        subscribe(houseDoors, "contact", houseDoorsHandler)
-    }
+
     if(turnOnButtons)
     {
-        ldebug("subscribing ${turnOnButtons}")
-        subscribe(sensor, "pushed", manualLightsOnHandler)
-        subscribe(sensor, "doubleTapped", manualLightsOnHandler)
-        subscribe(sensor, "held", manualLightsOnHandler)
+        ldebug("-subscribing ${turnOnButtons}")
+        // subscribe(sensor, "pushed", manualLightsOnHandler)
+        // subscribe(sensor, "doubleTapped", manualLightsOnHandler)
+        // subscribe(sensor, "held", manualLightsOnHandler)
 
         subscribe(turnOnButtons, "pushed", buttonTurnOnPushedHandler)
         subscribe(turnOnButtons, "doubleTapped", buttonTurnOnDoubleTappedHandler)
         subscribe(turnOnButtons, "held", buttonTurnOnHeldHandler)
     }
+}
 
-    lightGroupArray().each { grp -> 
-        if(grp.devices)
-        {
-            ldebug("subscribing ${grp.devices}")
-            subscribe(grp.devices, "switch", lightSwitchHandler)
-        }
+def subscribeToAll() 
+{
+    ldebug("subscribing all")
+
+    subscribeToEssentials() 
+
+    ldebug("-subscribing ${isDarkSwitch}")
+    subscribe(isDarkSwitch, "switch", darkSwitchHandler)
+
+    if(luxSensor)
+    {
+        ldebug("-subscribing ${luxSensor}")
+        subscribe(luxSensor, "illuminance", luxChangedHandler)
+    }    
+
+    if(roomDoors)
+    {
+        ldebug("-subscribing ${roomDoors}")
+        subscribe(roomDoors, "contact", roomDoorsHandler)
+    }
+
+    if(houseDoors)
+    {
+        ldebug("-subscribing ${houseDoors}")
+        subscribe(houseDoors, "contact", houseDoorsHandler)
     }
 
     if(motionSensorsTurnOn)
     {
         motionSensorsTurnOn.each { sensor ->
-            ldebug("subscribing ${sensor}")
+            ldebug("-subscribing ${sensor}")
             //subscribe(sensor, "motion.active", manualLightsOnHandler)            
             subscribe(sensor, "motion.active", motionTurnOnHandler)
             subscribe(sensor, "motion.inactive", motionStopTurnOnHandler)
         }
     }
+
     if(motionSensorsKeepOn)
     {
         motionSensorsKeepOn.each { sensor ->
-            ldebug("subscribing ${sensor}")
+            ldebug("-subscribing ${sensor}")
             subscribe(sensor, "motion.active", motionKeepOnHandler)
             subscribe(sensor, "motion.inactive", motionStopKeepOnHandler)
         }
     }
-    ldebug ("events subscriptions added")
-    sendLog("App is initialized")
+
+    sendLog("Subscribed all")
 }
+
+def modeHandler(evt) 
+{
+    setCallMethod("modeHandler")
+    state.modeJustChanged = true
+    def newMode = evt.value
+    linfo("Mode changed to ${newMode}")
+    if(getMode() != newMode)
+    {
+        linfo("Mode stays ${getMode()}, because of test")
+    }
+    
+    if(isAboutMode("Manual"))
+    {
+        subscribeToEssentials()
+    }
+    else
+    {
+        subscribeToAll()
+    }
+       
+    if(   (isAboutRoom("h,mb") && isAboutMode("SleepSome")) || isAboutMode("SleepAll,Away")    )
+    {
+        turnOffAllLights(true)
+        linfo("mode changed to ${getMode()}, all lights off")
+    }
+}
+
 
 //EVENTS SUBSCRIPTIONS START
 def lightSwitchHandler(evt) //WHEN LIGHTS TURNED ON BY AUTOMATION OR MANUALLY
 {
     setCallMethod("lightSwitchHandler")
+    def previousStateManuallyOn = state.turnedonmanually
     def device = evt.device
     def deviceName = device.displayName
     def deviceStatus = evt.value
     
+    // Check if enableManual is defined
+    if (enableManual == null) {
+        lerror("enableManual is not defined")
+        return
+    }
+
+  // Check if atomicState.automationLightsOn is defined
+    if (atomicState.automationLightsOn == null) {
+        lerror("atomicState.automationLightsOn is not defined")
+        return
+    }    
+
+    // Check if the mode is manual
+    if(isAboutMode("Manual"))
+    {
+        ldebug("Mode is manual, ignoring event")
+        sendLog("Mode is manual, ignoring event")
+        return
+    }    
 
     //DETERMINE IF LIGHTS ARE TURNED ON MANUALLY
     if(deviceStatus == "on" && enableManual)
@@ -406,6 +477,9 @@ def lightSwitchHandler(evt) //WHEN LIGHTS TURNED ON BY AUTOMATION OR MANUALLY
             sendLog("🫴 ${logElapsed}")
             state.skippedTurningOff = 0
             state.turnedonmanually = true
+            
+            subscribeToEssentials()
+            
             parent?.updateLightState(device?.id, null, true)
         }
         else
@@ -440,47 +514,28 @@ def lightSwitchHandler(evt) //WHEN LIGHTS TURNED ON BY AUTOMATION OR MANUALLY
         state.turnedonmanually = false
         parent?.updateLightState(device?.id, null, false)
     }
+
+    if(!state.turnedonmanually)
+    {
+        sendLog("!turnedonmanually: ${!state.turnedonmanually} & prevManuallyOn: ${previousStateManuallyOn}, resulting to subscribing to all: ${!state.turnedonmanually && previousStateManuallyOn}")
+        if(previousStateManuallyOn)
+        {
+            subscribeToAll()
+        }
+        
+    }
+
     
 }
 
-def manualLightsOnHandler(evt) 
-{
-    setCallMethod("manualLightsOnHandler")
-    def device = evt.device
-    def deviceName = device.displayName
-    def deviceStatus = evt.value
-    def deviceClass = evt.class
-}
-
-def modeHandler(evt) 
-{
-    setCallMethod("modeHandler")
-    state.modeJustChanged = true
-    def newMode = evt.value
-    linfo("Mode changed to ${newMode}")
-    if(getMode() != newMode)
-    {
-        linfo("Mode stays ${getMode()}, because of test")
-    }
-    //if(  ["SleepAll", "Away"].contains(getMode())  ||  ["SleepSome"].contains(getMode()) && ["h","mb"].contains(aboutRoom) )
-    if(   (isAboutRoom("h,mb") && isAboutMode("SleepSome")) || isAboutMode("SleepAll,Away")    )
-    {
-        turnOffAllLights(true)
-        linfo("mode changed to ${getMode()}, all lights off")
-    }
-    else
-    {
-        if(isAnySwitchOn(allLights()))        
-        {
-            //DO NOTHING
-            //roomsHandler()
-
-        }
-    }
-}
-
-
-
+// def manualLightsOnHandler(evt) 
+// {
+//     setCallMethod("manualLightsOnHandler")
+//     def device = evt.device
+//     def deviceName = device.displayName
+//     def deviceStatus = evt.value
+//     def deviceClass = evt.class
+// }
 
 def luxChangedHandler(evt) 
 {
@@ -496,13 +551,7 @@ def luxChangedHandler(evt)
            // extendSchedule(getStayOnState(), turnOffIfInactive)
         }
     }
-*/
-    
-    if(aboutRoom == "h")
-    {
-        //handleHallway()
-    }        
-    
+    */
 }
 
 def darkSwitchHandler(evt) 
@@ -569,19 +618,6 @@ def motionHandler(evt)
     state.lastmotiondt = nowDtStr()
     state.lastmotionby = deviceName    
     unschedule()
-
-    // allLights().each { grp ->
-    //     if(grp)
-    //     {
-    //         ldebug("no motion, removing state ${grp.id}")
-    //         //parent?.removeLightState(grp.id)
-    //         //parent?.updateLightState(grp.id, )
-    //     }
-    // } 
-
-    // if(isAnySwitchOn(allLights())) //WILL THIS CAUSE TROUBLE?
-    // {
-    // }
 }
 
 def motionStopTurnOnHandler(evt) 
@@ -789,6 +825,19 @@ def turnOffLights(lights, force = false)
     if (isAnySwitchOn(lights)) 
     {
         linfo("Turning off ${lights} lights")
+        lights.off()
+        sendLog("${lights} off")
+    } 
+    else 
+    {
+        linfo("Lights ${lights} already off")
+    }
+
+    /*
+    FOLLOWING NOT NECESARRY AS SUBSCRIPTIONS TO TRIGGER IT OFF IS REMOVED
+    if (isAnySwitchOn(lights)) 
+    {
+        linfo("Turning off ${lights} lights")
 
         //if(state.turnedonmanually && state.skippedTurningOff <= 10)
         if(state.turnedonmanually && !force) //TODO state name change?
@@ -806,7 +855,8 @@ def turnOffLights(lights, force = false)
     else 
     {
         linfo("Lights ${lights} already off")
-    }    
+    }  
+    */  
 }
 
 def checkMotionAndTurnOff() 
@@ -829,44 +879,18 @@ def checkMotionAndTurnOff()
         runIn(state.cfgStayon, checkMotionAndTurnOff) // Check again after 1 minute if motion persists
     }    
 }
-
 //ACTIONS END
-
-
-
-
 
 
 //HANDLE ROOM START
 def roomsHandler()
 {
     setCallMethod("roomsHandler")
-    state.turnedonmanually = false
-    parent?.updateLightState(device?.id, null, false)
+    //state.turnedonmanually = false
+    //parent?.updateLightState(device?.id, null, false)
     
-    if(isAboutRoom("test")){ handleGeneral() }
-    /*
-    else if ( isAboutRoom("h") ) { handleHallway() }
-    else if ( isAboutRoom("mb") ) { handleMasterBedroom() }
-    else if ( isAboutRoom("lr") ) { handleLivingRoom() }
-    else if ( isAboutRoom("o") ) { handleOffice() }
-    else if ( isAboutRoom("g,k,d") ) { handleSimpleMotion() }
-    */
-    else if ( isAboutRoom("h,mb,lr,k,o,g,k,d") ) { handleGeneral() }
+    if(isAboutRoom("h,mb,lr,k,o,g,k,d,test")){ handleGeneral() }
     else if ( isAboutRoom("w,s") ) { handleSimpleDoor() }    
-}
-
-void settingsHandler(states)
-{
-    setCallMethod("settingsHandler")
-    lightGroupArray().each { grp ->
-        if(grp)
-        {
-            ldebug("dynamic go through ${states.mode}, ${grp.id} and ${states.isRoomState}")
-            def cfg = getConfig(states.mode, grp.id, states.isRoomState)    
-            handleLightsBasedOnConfig(states, cfg, grp.devices)                    
-        }
-    }   
 }
 
 void handleGeneral(manual = "")
@@ -897,29 +921,18 @@ void handleGeneral(manual = "")
         */   
         else
         {
-            settingsHandler(states)    
+            lightGroupArray().each { grp ->
+                if(grp)
+                {
+                    ldebug("dynamic go through ${states.mode}, ${grp.id} and ${states.isRoomState}")
+                    def cfg = getConfig(states.mode, grp.id, states.isRoomState)    
+                    handleLightsBasedOnConfig(states, cfg, grp.devices)                    
+                }
+            }             
         }
     }    
 }
 
-void handleSimpleMotion(manual = "") //LOW LIGHT AND MOTION ON OR OFF
-{
-    setCallMethod("handleSimpleMotion")
-    def currentMode = getMode()
-    def states = allStates()
-    
-    if(states.isvalidmode)
-    {
-        if(false)
-        {
-        
-        } 
-        else
-        {
-            settingsHandler(states)         
-        }           
-    }
-}
 
 void handleSimpleDoor(manual = "") //CONTACT ON OR OFF
 {

@@ -236,7 +236,7 @@ def statusAndAlert(data)
         ldebug("atomicState[${key}] = ${value}")
     }    
 */
-    //ldebug("<b>location.getVariable ${location.getVariable("turnofftime_40")}</b>")
+    //ldebug("<b>location.getVariable ${location.getVariable("turnOffTime_40")}</b>")
     //def messagedoors = "🚪:${openDoors.size()}"
     //def messagelights = "💡:${lightsOn.size()}"
     //def messagemotions = "👋:${motionNames.size()}"
@@ -258,8 +258,8 @@ def statusAndAlert(data)
                 def elapsedTimeInMinutes = Math.round(elapsedTime / (1000) / 60)
                 if (elapsedTime > (notifyOnMinutes * 60000))    // 1 minutes = 60000 milliseconds                               
                 {
-                    ldebug("${lightOn.name} has been on for ${elapsedTimeInMinutes} minutes = ${lightEventDate.time}")
-                    sendImportant("${lightOn.name} has been on for ${elapsedTimeInMinutes} minutes!")
+                    ldebug("${lightOn.name} has been on for ${elapsedTimeInMinutes} minutes = ${lightEventDate.time} (manually: ${lightState?.manuallyOn})")
+                    sendImportant("${lightOn.name} has been on for ${elapsedTimeInMinutes} minutes (manually: ${lightState?.manuallyOn})!")
                 }
             }
 
@@ -379,14 +379,14 @@ def updateLightState(lightId, turnOffTime = null, manuallyOn = null)
 
     if (existingLightState) 
     {
-        if(turnofftime != null)
+        if(turnOffTime != null)
         {
             existingLightState.turnOffTime = turnOffTime
             llog("Updated light <b>${lightId}</b> with turnOffTime: ${turnOffTime}","Updated light <b>${lightId}</b> states in parent: \n${state.lightsStates}")
         }
-        if(turnofftime != null)
+        if(manuallyOn != null)
         {
-            existingLightState.turnOffTime = turnOffTime
+            existingLightState.manuallyOn = manuallyOn
             llog("Updated light <b>${lightId}</b> with manuallyOn: ${manuallyOn}","Updated light <b>${lightId}</b> states in parent: \n${state.lightsStates}")
         }
     } 
