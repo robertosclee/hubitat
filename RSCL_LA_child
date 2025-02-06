@@ -480,12 +480,14 @@ def lightSwitchHandler(evt) //WHEN LIGHTS TURNED ON BY AUTOMATION OR MANUALLY
             
             subscribeToEssentials()
             
-            parent?.updateLightState(device?.id, null, true)
+            //parent?.updateLightState(device?.id, null, true)
+            updateLightStateManuallyOn(true)
         }
         else
         {
             sendLog("⚙️ ${logElapsed}")
-            parent?.updateLightState(device?.id, null, false)
+            //parent?.updateLightState(device?.id, null, false)
+            updateLightStateManuallyOn(false)
         }
     }
     else
@@ -498,7 +500,7 @@ def lightSwitchHandler(evt) //WHEN LIGHTS TURNED ON BY AUTOMATION OR MANUALLY
 
         state.skippedTurningOff = 0
         state.turnedonmanually = false
-        parent?.updateLightState(device?.id, null, false)
+        updateLightStateManuallyOn(false)
     }    
 
     if(deviceStatus == "off")
@@ -512,7 +514,7 @@ def lightSwitchHandler(evt) //WHEN LIGHTS TURNED ON BY AUTOMATION OR MANUALLY
     {
         state.skippedTurningOff = 0
         state.turnedonmanually = false
-        parent?.updateLightState(device?.id, null, false)
+        updateLightStateManuallyOn(false)
     }
 
     if(!state.turnedonmanually)
@@ -617,6 +619,9 @@ def motionHandler(evt)
     ldebug("${deviceName} <b>${deviceStatus}</b>")
     state.lastmotiondt = nowDtStr()
     state.lastmotionby = deviceName    
+
+    updateLightStateLastMotionTime(state.lastmotiondt)
+
     unschedule()
 }
 
@@ -654,14 +659,7 @@ def motionStopHandler(evt, m)
                 
                 //parent?.state.lightsStates = [] //RESET FOR TEST PURPOSE
                 llog("planned off ${  getFormatted(state.turnofftime) }", "motion stop ${deviceName}, lights off in ${state.cfgStayon}s, ${  getFormatted(state.turnofftime) }")
-                allLights().each { grp ->
-                    if(grp)
-                    {
-                        ldebug("updateLightState ${grp.id} ${grp.name} ${state.turnofftime}")
-                        //parent?.updateLightState(grp.id, grp.name, state.turnofftime)
-                        parent?.updateLightState(grp.id, state.turnofftime, null)
-                    }
-                }                     
+                updateLightStateTurnOffTime(state.turnofftime)
             }    
             else
             {
@@ -1474,6 +1472,39 @@ void addConfigItem(String configName)
         state.usedConfigHistory = state.usedConfigHistory.take(5)
     }
 }
+
+void updateLightStateTurnOffTime(input)
+{
+    allLights().each { grp ->
+        if(grp)
+        {
+            ldebug("updateLightState ${grp.id} ${grp.name} ${input}")
+            parent?.updateLightState(grp.id, input, null)
+        }
+    }       
+}
+void updateLightStateManuallyOn(input)
+{
+    allLights().each { grp ->
+        if(grp)
+        {
+            ldebug("updateLightState ${grp.id} ${grp.name} ${input}")
+            parent?.updateLightState(grp.id, null, input, null)
+        }
+    }       
+}
+void updateLightStateLastMotionTime(input)
+{
+    allLights().each { grp ->
+        if(grp)
+        {
+            ldebug("updateLightState ${grp.id} ${grp.name} ${input}")
+            parent?.updateLightState(grp.id, null, null, input)
+        }
+    }       
+}
+
+
 
 
 def setAppname(String str = null)

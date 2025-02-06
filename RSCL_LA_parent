@@ -248,7 +248,8 @@ def statusAndAlert(data)
             
             def lightState = state.lightsStates?.find { it.id.toString() == lightOn.id.toString() }
             def turnOffTimeFormatted = getFormatted(lightState?.turnOffTime) ?: ""
-            def manuallyOnFormatted = lightState?.manuallyOn ? "🫴" : "⚙️"
+            def manuallyOnFormatted = (lightState?.manuallyOn ?: false) ? "🫴" : "⚙️"
+            def lastMotionTimeFormatted = "motion: ${getFormatted(lightState?.lastMotionTime) ?: ''}"
 
             def lightEventDate = lightOn.latestState("switch")?.date
             if(lightEventDate)
@@ -263,7 +264,7 @@ def statusAndAlert(data)
                 }
             }
 
-            return "${lightOn.displayName} ${turnOffTimeFormatted} ${manuallyOnFormatted}" 
+            return "${lightOn.displayName} ${manuallyOnFormatted} ${turnOffTimeFormatted} ${lastMotionTimeFormatted}" 
         }.join(joinChars)
 
         message += "\n${lightNames}"
@@ -372,7 +373,7 @@ def turnOffLightsExcept(triggerMethod, excludePartialNames = [])
     
 }
 
-def updateLightState(lightId, turnOffTime = null, manuallyOn = null) 
+def updateLightState(lightId, turnOffTime = null, manuallyOn = null, lastMotionTime = null) 
 {
     def s = state.lightsStates ?: []
     def existingLightState = s.find { it.id == lightId }
@@ -382,20 +383,26 @@ def updateLightState(lightId, turnOffTime = null, manuallyOn = null)
         if(turnOffTime != null)
         {
             existingLightState.turnOffTime = turnOffTime
-            llog("Updated light <b>${lightId}</b> with turnOffTime: ${turnOffTime}","Updated light <b>${lightId}</b> states in parent: \n${state.lightsStates}")
+            llog("Updated light <b>${lightId}</b> with turnOffTime: ${turnOffTime}","Updated light <b>${lightId}</b> with turnOffTime: ${turnOffTime}")
         }
         if(manuallyOn != null)
         {
             existingLightState.manuallyOn = manuallyOn
-            llog("Updated light <b>${lightId}</b> with manuallyOn: ${manuallyOn}","Updated light <b>${lightId}</b> states in parent: \n${state.lightsStates}")
+            llog("Updated light <b>${lightId}</b> with manuallyOn: ${manuallyOn}","Updated light <b>${lightId}</b> with manuallyOn: ${manuallyOn}")
         }
+        if(lastMotionTime != null)
+        {
+            existingLightState.lastMotionTime = lastMotionTime
+            llog("Updated light <b>${lightId}</b> with lastMotionTime: ${lastMotionTime}","Updated light <b>${lightId}</b> with lastMotionTime: ${lastMotionTime}")
+        }        
     } 
     else 
     {
         def newLightState = [
             id: lightId,
             turnOffTime: turnOffTime,
-            manuallyOn: manuallyOn
+            manuallyOn: manuallyOn,
+            lastMotionTime: lastMotionTime
         ]
         s << newLightState
         llog("Added light <b>${lightId}</b>", "Added light <b>${lightId}</b> states in parent: \n${state.lightsStates}")
