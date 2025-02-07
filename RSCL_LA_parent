@@ -240,6 +240,8 @@ def statusAndAlert(data)
     //def messagedoors = "🚪:${openDoors.size()}"
     //def messagelights = "💡:${lightsOn.size()}"
     //def messagemotions = "👋:${motionNames.size()}"
+
+    def durationsOn = []
     def joinChars = "\n"
     if (lightsOn) 
     {
@@ -248,8 +250,15 @@ def statusAndAlert(data)
             
             def lightState = state.lightsStates?.find { it.id.toString() == lightOn.id.toString() }
             def turnOffTimeFormatted = getFormatted(lightState?.turnOffTime) ?: ""
-            def manuallyOnFormatted = (lightState?.manuallyOn ?: false) ? "🫴" : "⚙️"
-            def lastMotionTimeFormatted = "motion: ${getFormatted(lightState?.lastMotionTime) ?: ''}"
+            def manuallyOnFormatted = (lightState?.manuallyOn ?: true) ? "🫴" : "⚙️"
+
+            def lastMotionTimeFormatted = ""
+            if(lightState?.lastMotionTime)
+            {
+                lastMotionTimeFormatted = "motion: ${getFormatted(lightState?.lastMotionTime)}"
+            }
+            
+            def onForAtleastHourPrefix = ""
 
             def lightEventDate = lightOn.latestState("switch")?.date
             if(lightEventDate)
@@ -257,20 +266,28 @@ def statusAndAlert(data)
                 def elapsedTime = new Date().time - lightEventDate.time  // Time difference in milliseconds
                 def elapsedTimeInSeconds = elapsedTime / (1000)
                 def elapsedTimeInMinutes = Math.round(elapsedTime / (1000) / 60)
+                onForAtleastHourPrefix = (elapsedTime > (60 * 60000)) ? "⚠️" :""
+
                 if (elapsedTime > (notifyOnMinutes * 60000))    // 1 minutes = 60000 milliseconds                               
                 {
-                    ldebug("${lightOn.name} has been on for ${elapsedTimeInMinutes} minutes = ${lightEventDate.time} (manually: ${lightState?.manuallyOn})")
-                    sendImportant("${lightOn.name} has been on for ${elapsedTimeInMinutes} minutes (manually: ${lightState?.manuallyOn})!")
+                    ldebug("${lightOn.name} has been on for ${elapsedTimeInMinutes} minutes = ${lightEventDate.time}")
+                    durationsOn << "${manuallyOnFormatted}${onForAtleastHourPrefix}${lightOn.name} on for ${elapsedTimeInMinutes} min." 
                 }
             }
 
-            return "${lightOn.displayName} ${manuallyOnFormatted} ${turnOffTimeFormatted} ${lastMotionTimeFormatted}" 
+            return "${manuallyOnFormatted}${onForAtleastHourPrefix}${lightOn.name} ${turnOffTimeFormatted} ${lastMotionTimeFormatted}" 
         }.join(joinChars)
 
         message += "\n${lightNames}"
-        
-        //EXTRA NOTIFICATION IN LIGHTS ARE LONG ON
 
+        // Remove duplicates from durationsOn
+        durationsOn = durationsOn.unique()
+
+        if (!durationsOn.isEmpty()) 
+        {
+            //EXTRA NOTIFICATION IN LIGHTS THAT ARE LONG ON
+            sendImportant(durationsOn.join(joinChars))
+        }
 
     }
     if (openDoors) 
@@ -383,17 +400,17 @@ def updateLightState(lightId, turnOffTime = null, manuallyOn = null, lastMotionT
         if(turnOffTime != null)
         {
             existingLightState.turnOffTime = turnOffTime
-            llog("Updated light <b>${lightId}</b> with turnOffTime: ${turnOffTime}","Updated light <b>${lightId}</b> with turnOffTime: ${turnOffTime}")
+            //llog("Updated light <b>${lightId}</b> with turnOffTime: ${turnOffTime}","Updated light <b>${lightId}</b> with turnOffTime: ${turnOffTime}")
         }
         if(manuallyOn != null)
         {
             existingLightState.manuallyOn = manuallyOn
-            llog("Updated light <b>${lightId}</b> with manuallyOn: ${manuallyOn}","Updated light <b>${lightId}</b> with manuallyOn: ${manuallyOn}")
+            //llog("Updated light <b>${lightId}</b> with manuallyOn: ${manuallyOn}","Updated light <b>${lightId}</b> with manuallyOn: ${manuallyOn}")
         }
         if(lastMotionTime != null)
         {
             existingLightState.lastMotionTime = lastMotionTime
-            llog("Updated light <b>${lightId}</b> with lastMotionTime: ${lastMotionTime}","Updated light <b>${lightId}</b> with lastMotionTime: ${lastMotionTime}")
+            //llog("Updated light <b>${lightId}</b> with lastMotionTime: ${lastMotionTime}","Updated light <b>${lightId}</b> with lastMotionTime: ${lastMotionTime}")
         }        
     } 
     else 
@@ -405,7 +422,7 @@ def updateLightState(lightId, turnOffTime = null, manuallyOn = null, lastMotionT
             lastMotionTime: lastMotionTime
         ]
         s << newLightState
-        llog("Added light <b>${lightId}</b>", "Added light <b>${lightId}</b> states in parent: \n${state.lightsStates}")
+        //llog("Added light <b>${lightId}</b>", "Added light <b>${lightId}</b> states in parent: \n${state.lightsStates}")
     }
     state.lightsStates = s
 }

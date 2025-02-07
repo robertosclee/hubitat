@@ -617,9 +617,9 @@ def motionHandler(evt)
     
     //ldebug("${deviceName} <b>${deviceStatus}</b>, 💡${ isAnySwitchOn(allLights()) ? "keep on" : "turn on accordingly" }")
     ldebug("${deviceName} <b>${deviceStatus}</b>")
-    state.lastmotiondt = nowDtStr()
+    
     state.lastmotionby = deviceName    
-
+    state.lastmotiondt = nowDtStr()
     updateLightStateLastMotionTime(state.lastmotiondt)
 
     unschedule()
@@ -641,8 +641,11 @@ def motionStopHandler(evt, m)
 
     def device = evt.device // The device that triggered the event
     def deviceName = device.displayName // Get the name of the light
-    def deviceStatus = evt.value // Get the value (should be "off" in this case)    
-    
+    def deviceStatus = evt.value // Get the value (should be "off" in this case)  
+
+    state.lastmotiondt = nowDtStr()  
+    updateLightStateLastMotionTime(state.lastmotiondt)
+
     //TEST IF LIGHTS ARE ON AND ALL MOTION OFF?
     if(  isAnySwitchOn(allLights()) && !isAnyMotionActive(allMotionSensors()) )
     {
@@ -712,18 +715,18 @@ def buttonTurnOnHeldHandler(evt)
 void handleLightsBasedOnConfig(states, configs, lights)
 {
     setCallMethod("handleLightsBasedOnConfig")
-    linfo("<code style='background-color: yellow'>${configs.base}</code>, values: ${configs.values}")
+    linfo("<code style='background-color: yellow'>${configs.base}</code>")
     ldebug("values: ${configs.values}")
     addConfigItem(configs.base)
     if(configs.values && configs.values.do)
     {
         if( configs.values.turnon && configs.values.forcechange )
         {
-            turnOnLights(states, configs, lights, comment = "ON FORCED ${configs.values}") 
+            turnOnLights(states, configs, lights, comment = "ON FORCED") 
         }
         else if( configs.values.turnon && !configs.values.forcechange)
         {
-            turnOnLights(states, configs, lights, comment = "ON ${configs.values}, ${states.lux} < ${states.luxThreshold}?") 
+            turnOnLights(states, configs, lights, comment = "ON, ${states.lux} < ${states.luxThreshold}?") 
         }
         else if( !configs.values.turnon )
         {
@@ -731,7 +734,7 @@ void handleLightsBasedOnConfig(states, configs, lights)
         }
         else
         {
-            ldebug("NO MATCH, ${configs.values}, ${states.lux} < ${states.luxThreshold}?")   
+            ldebug("NO MATCH, ${states.lux} < ${states.luxThreshold}?")   
         }
     }
 }
@@ -1478,7 +1481,7 @@ void updateLightStateTurnOffTime(input)
     allLights().each { grp ->
         if(grp)
         {
-            ldebug("updateLightState ${grp.id} ${grp.name} ${input}")
+            ldebug("ls turnoff time <b>${grp.id} ${grp.name}</b> ${input}")
             parent?.updateLightState(grp.id, input, null)
         }
     }       
@@ -1488,7 +1491,7 @@ void updateLightStateManuallyOn(input)
     allLights().each { grp ->
         if(grp)
         {
-            ldebug("updateLightState ${grp.id} ${grp.name} ${input}")
+            ldebug("ls manually on <b>${grp.id} ${grp.name}</b> ${input}")
             parent?.updateLightState(grp.id, null, input, null)
         }
     }       
@@ -1498,7 +1501,7 @@ void updateLightStateLastMotionTime(input)
     allLights().each { grp ->
         if(grp)
         {
-            ldebug("updateLightState ${grp.id} ${grp.name} ${input}")
+            ldebug("ls last motion time <b>${grp.id} ${grp.name}</b> ${input}")
             parent?.updateLightState(grp.id, null, null, input)
         }
     }       
