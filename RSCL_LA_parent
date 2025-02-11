@@ -56,7 +56,7 @@ def updated() {
 
 def initialize() 
 {
-    setAppname("watcher")
+    setAppname("👁️")
     setCallMethod("initialize")
 
     state.lightsStates = []
@@ -247,7 +247,7 @@ def statusAndAlert(data)
     {
         //def lightNames = lightsOn.collect {lightOn -> "${lightOn.displayName} ⏳ ${ getFormatted(state.lightsStates?.find { it.id.toString() == lightOn.id.toString() }?.turnOffTime ) ?: "" } " }.join(joinChars)
         def lightNames = lightsOn.collect { lightOn ->
-            
+            def brightness = lightOn.currentValue("level") ?: 0
             def lightState = state.lightsStates?.find { it.id.toString() == lightOn.id.toString() }
             def turnOffTimeFormatted = getFormatted(lightState?.turnOffTime) ?: ""
             def manuallyOnFormatted = (lightState?.manuallyOn ?: true) ? "🫴" : "⚙️"
@@ -275,7 +275,7 @@ def statusAndAlert(data)
                 }
             }
 
-            return "${manuallyOnFormatted}${onForAtleastHourPrefix}${lightOn.name} ${turnOffTimeFormatted} ${lastMotionTimeFormatted}" 
+            return "${manuallyOnFormatted}${onForAtleastHourPrefix}${lightOn.name}, ${brightness}% ${turnOffTimeFormatted} ${lastMotionTimeFormatted}" 
         }.join(joinChars)
 
         message += "\n${lightNames}"
@@ -286,7 +286,7 @@ def statusAndAlert(data)
         if (!durationsOn.isEmpty()) 
         {
             //EXTRA NOTIFICATION IN LIGHTS THAT ARE LONG ON
-            sendImportant(durationsOn.join(joinChars))
+            sendImportant("${durationsOn.join(joinChars)}\n#watcher #on_long_time #${toLowerIfNotEmpty(location.mode)}")
         }
 
     }
@@ -482,7 +482,7 @@ void sendMessage(Object devices, String message, appName = "", methodName = "")
         devices.each { device ->
             if (device.hasCapability("Notification")) 
             {
-                def msg = "[⚙️${appName}] ➜ ${message}"
+                def msg = "[🚀${appName}] ➜ ${message}"
                 device.deviceNotification(msg)
                 l(msg, appName, methodName, "debug")
             }
@@ -628,13 +628,25 @@ def retrieveDt(input, format = "yyyy-MM-dd'T'HH:mm:ss.SSS")
 
 def getFormatted(input, format = "HH:mm:ss.SSS")
 {
+    def result = retrieveDt(input)
+    if (result) {
+        def dateFormat = format ?: (logEnable ? "HH:mm:ss.SSS" : "HH:mm:ss")
+        return "${result.format(dateFormat)} (${humanizeDatetime(result)})"
+    }
+
+    /* OLD
         def result = retrieveDt(input)
         if(result)
         {
             return "${result.format(format)} (${humanizeDatetime(result)})" 
         }
+    */
 }
 
 def isDate(input) {
     return input instanceof Date
+}
+
+def toLowerIfNotEmpty(String str) {
+    return str?.trim() ? str.toLowerCase() : str
 }

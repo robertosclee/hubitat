@@ -103,13 +103,19 @@ section("DEVICES", hideable: true, hidden: false)
         //paragraph "${ humanizeDatetime(getLatestStatesSortedByTime(grp[2], "switch").time) }"
     }    
 
+    input "userComments", "text", title: "Comments", description: "Add any notes here", required: false
+
     statesDevices = ""
     motionSensorsTurnOn.each{d -> statesDevices += "${d.latestState("motion")?.date.format(dtFormat)} (${humanizeDatetime(d.latestState("motion")?.date)}) "}
-    input "motionSensorsTurnOn", "capability.motionSensor", title: "'Turn on' motion sensors<br/>${isAnyMotionActive(motionSensorsTurnOn) ? '<span class="yellow"><b>active</b>' : '<span><b>inactive</b>'} since ${statesDevices}</span>", required: false, multiple: true, width: 6
+    input "motionSensorsTurnOn", "capability.motionSensor", title: "'Turn on' motion sensors<br/>${isAnyMotionActive(motionSensorsTurnOn) ? '<span class="yellow"><b>active</b>' : '<span><b>inactive</b>'} since ${statesDevices}</span>", required: false, multiple: true, width: 4
     
     statesDevices = ""
     motionSensorsKeepOn.each{d -> statesDevices += "${d.latestState("motion")?.date.format(dtFormat)} (${humanizeDatetime(d.latestState("motion")?.date)}) "}
-    input "motionSensorsKeepOn", "capability.motionSensor", title: "'Keep on' motion sensors<br/>${isAnyMotionActive(motionSensorsKeepOn) ? '<span class="yellow"><b>active</b>' : '<span><b>inactive</b>'} since ${statesDevices}</span>", required: false, multiple: true, width: 6
+    input "motionSensorsKeepOn", "capability.motionSensor", title: "'Keep on' motion sensors<br/>${isAnyMotionActive(motionSensorsKeepOn) ? '<span class="yellow"><b>active</b>' : '<span><b>inactive</b>'} since ${statesDevices}</span>", required: false, multiple: true, width: 4
+
+    statesDevices = ""
+    motionSensorsDisable.each{d -> statesDevices += "${d.latestState("motion")?.date.format(dtFormat)} (${humanizeDatetime(d.latestState("motion")?.date)}) "}
+    input "motionSensorsDisable", "capability.motionSensor", title: "'Disabling (deactivate automations)' motion sensors<br/>${isAnyMotionActive(motionSensorsDisable) ? '<span class="yellow"><b>active</b>' : '<span><b>inactive</b>'} since ${statesDevices}</span>", required: false, multiple: true, width: 4
 
     statesDevices = ""
     roomDoors.each{d -> statesDevices += "${d.latestState("contact")?.date.format(dtFormat)} (${humanizeDatetime(d.latestState("contact")?.date)}) "}
@@ -351,6 +357,15 @@ def subscribeToEssentials()
         subscribe(turnOnButtons, "doubleTapped", buttonTurnOnDoubleTappedHandler)
         subscribe(turnOnButtons, "held", buttonTurnOnHeldHandler)
     }
+
+    if(motionSensorsDisable)
+    {
+        motionSensorsDisable.each { sensor ->
+            ldebug("-subscribing ${sensor}")
+            subscribe(sensor, "motion.active", motionDisablerHandler)
+            subscribe(sensor, "motion.inactive", motionDisablerStopHandler)
+        }
+    }    
 }
 
 def subscribeToAll() 
@@ -474,7 +489,7 @@ def lightSwitchHandler(evt) //WHEN LIGHTS TURNED ON BY AUTOMATION OR MANUALLY
         def logElapsed = "${elapsedTime}ms (elapsed) > ${thresholdDetermineIfAutomation}ms (threshold)"
         if(elapsedTime > thresholdDetermineIfAutomation)
         {
-            sendLog("🫴 ${logElapsed}")
+            sendLogImportant("🫴 ${logElapsed}")
             state.skippedTurningOff = 0
             state.turnedonmanually = true
             
@@ -591,6 +606,15 @@ def doorHandler(evt, m)
     roomsHandler()     
 }
 
+//TO TEST
+def motionDisablerStopHandler(evt) 
+{
+    //subscribeToAll()    
+}
+def motionDisablerHandler(evt) 
+{
+    //subscribeToEssentials()
+}
 
 def motionTurnOnHandler(evt) 
 {
@@ -675,6 +699,9 @@ def motionStopHandler(evt, m)
         }
     }
 }
+
+
+
 
 def buttonTurnOnPushedHandler(evt)
 {
@@ -762,28 +789,24 @@ void turnOnLights(states, configs, lights, comment = "")
                         {
                             def hsl = hexToHSL(configs.values.color)
                             light.setColor([hue: hsl.hue, saturation: hsl.saturation, level: configs.values.brightness])
-                            linfo ("${light.displayName} ON, COLOR: ${hsl}")
                             sendLog("${light.displayName} ON, color ${hsl}")
                         }
                         else
                         {
                             light.setLevel(configs.values.brightness)
-                            linfo ("${light.displayName} ON, LEVEL: ${configs.values.brightness}%")
                             sendLog("${light.displayName} ON, brightness ${configs.values.brightness}%")
                         }
                     }
                     else
                     {
-                        linfo ("${light.displayName} ON, NO CHANGE SETTING ${light.displayName} [${configs.do}], ${comment}")
-                        sendLog("${light.displayName} ON, no settings used")
                         light.on()
+                        sendLog("${light.displayName} ON, NO SETTING USED ${light.displayName} [${configs.do}], ${comment}")
                     }
                 }
                 else if( !configs.values.turnon )
                 {
                     light.off()
-                    linfo("${light.displayName} OFF [${configs.turnon}], ${comment}")
-                    sendLog("${light.displayName} OFF")
+                    sendLog("${light.displayName} OFF [${configs.turnon}], ${comment}")
                 }
 
 
@@ -794,7 +817,7 @@ void turnOnLights(states, configs, lights, comment = "")
     }
     else
     {
-        linfo("ON LIGHTS NOT SUCCESSFUL, APP DISABLED")
+        sendLog("ON LIGHTS NOT SUCCESSFUL, APP DISABLED")
     }
 }
 
@@ -1059,12 +1082,14 @@ def deleteConfigurations()
 
 def isAboutRoom(commadelimitedInput)
 {
-    return commadelimitedInput.split(',').contains(aboutRoom)
+    //return commadelimitedInput.split(',').contains(aboutRoom)
+    return parent?.toLowerIfNotEmpty(commadelimitedInput).split(',').contains(parent?.toLowerIfNotEmpty(aboutRoom))
 }
 
 def isAboutMode(commadelimitedInput)
 {
-    return commadelimitedInput.split(',').contains(getMode())
+    //return commadelimitedInput.split(',').contains(getMode())
+    return parent?.toLowerIfNotEmpty(commadelimitedInput).split(',').contains(parent?.toLowerIfNotEmpty(getMode()))
 }
 
 def lightGroupArray()
@@ -1526,7 +1551,6 @@ def getCallMethod()
 {
     return state.callMethod
 }
-
 def llog(infomessage, debugmessage)
 {
     if(parent?.txtEnable)
@@ -1555,6 +1579,17 @@ def linfo(message)
 	parent?.l(message, getAppname(), getCallMethod(), "info")
 }
 void sendLog(String message)
+{
+    if(parent?.logEnable)
+    {
+        parent?.sendMessage( parent?.sendMessageLog, message, getAppname(), getCallMethod() )
+    }
+    else
+    {
+        linfo(message)
+    }
+}
+void sendLogImportant(String message)
 {
     parent?.sendMessage( parent?.sendMessageLog, message, getAppname(), getCallMethod() )
 }
