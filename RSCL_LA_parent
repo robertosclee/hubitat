@@ -117,16 +117,7 @@ def modeChangeHandler(evt)
     setCallMethod("modeChangeHandler")
     ldebug("Mode changed to: ${evt.value}")
     sendImportant("Mode changed to: ${evt.value}\n#watcher")
-    if ( ["SleepAll", "SleepSome"].contains(location.mode) )
-    {
-        def excludePartialNames = ["kids"]
-        turnOffLightsExcept(callMethod, excludePartialNames)
-    }    
-    if ( ["Away"].contains(location.mode) )
-    {
-        def excludePartialNames = []
-        turnOffLightsExcept(callMethod, excludePartialNames)
-    }        
+    turnOffMultipleWhenModeOrManual()  
 }
 
 def manualLightsOffTriggerHandler(evt) 
@@ -136,19 +127,32 @@ def manualLightsOffTriggerHandler(evt)
     if(evt.value == "on")
     {
         ldebug("All lights off triggered: ${evt.device}")
-        if (["SleepAll", "SleepSome"].contains(location.mode))
-        {
-            def excludePartialNames = ["kids"]
-            turnOffLightsExcept(callMethod, excludePartialNames)
-        }    
-        else
-        {
-            def excludePartialNames = []
-            turnOffLightsExcept(callMethod, excludePartialNames)        
-        }
+        turnOffMultipleWhenModeOrManual()
     }	
 
 }
+
+def turnOffMultipleWhenModeOrManual()
+{
+    setCallMethod("turnOffMultipleWhenModeOrManual")
+    if ( ["SleepSome"].contains(location.mode) )
+    {
+        def excludePartialNames = ["kids","living","kitchen"]		
+        turnOffLightsExcept(callMethod, excludePartialNames)
+    }   
+    if ( ["SleepAll"].contains(location.mode) )
+    {
+        def excludePartialNames = ["kids"]
+        turnOffLightsExcept(callMethod, excludePartialNames)
+    }    
+    if ( ["Away"].contains(location.mode) )
+    {
+        def excludePartialNames = []
+        turnOffLightsExcept(callMethod, excludePartialNames)
+    }   
+}
+
+
 
 def appButtonHandler(buttonName) 
 {

@@ -437,11 +437,13 @@ def modeHandler(evt)
         subscribeToAll()
     }
        
+    /*
     if(   (isAboutRoom("h,mb") && isAboutMode("SleepSome")) || isAboutMode("SleepAll,Away")    )
     {
         turnOffAllLights(true)
         linfo("mode changed to ${getMode()}, all lights off")
     }
+    */
 }
 
 
